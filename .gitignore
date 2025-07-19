@@ -1,0 +1,44 @@
+# ESP-IDF Build System
+build/
+sdkconfig.old
+.config.old
+
+# IDE Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+.env
+
+# Logs
+*.log
+
+# Dependencies
+dependencies.lock
+
+# Flash Download Tool
+*.bin
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Editor backup files
+*~
+*.bak 
