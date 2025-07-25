@@ -20,32 +20,43 @@ Any ESP32 board with sufficient GPIO pins
 - **Driver**: DRV8833 dual motor driver
 - **Linear Actuator**: 90mm stroke lead screw assembly
 
-### Wiring Connections
+### Complete Pin Mapping
 
-#### DRV8833 to ESP32:
-```
-DRV8833 AIN1 → ESP32 GPIO21
-DRV8833 AIN2 → ESP32 GPIO19
-DRV8833 BIN1 → ESP32 GPIO16
-DRV8833 BIN2 → ESP32 GPIO17
-DRV8833 SLEEP → ESP32 GPIO23
-DRV8833 FAULT → ESP32 GPIO22
-```
+#### GPIO Pin Assignments Summary
+| GPIO | Function | Direction | Device/Component |
+|------|----------|-----------|------------------|
+| GPIO2 | LED1 Control | Output | On-board LED |
+| GPIO4 | LED2 Control | Output | External LED |
+| GPIO5 | LED3 Control | Output | External LED |
+| GPIO16 | DRV8833 BIN1 | Output | Motor Phase B |
+| GPIO17 | DRV8833 BIN2 | Output | Motor Phase B |
+| GPIO18 | LED4 Control | Output | External LED |
+| GPIO19 | DRV8833 AIN2 | Output | Motor Phase A |
+| GPIO21 | DRV8833 AIN1 | Output | Motor Phase A |
+| GPIO22 | DRV8833 FAULT | Input | Fault Detection |
+| GPIO23 | DRV8833 SLEEP | Output | Driver Enable |
 
-#### LEDs to ESP32:
-```
-LED1 → ESP32 GPIO2
-LED2 → ESP32 GPIO4
-LED3 → ESP32 GPIO5
-LED4 → ESP32 GPIO18
-```
+#### Motor Wire Connections
+| Motor Wire | Color | DRV8833 Terminal |
+|------------|-------|------------------|
+| Phase A+ | Blue | AOUT1 |
+| Phase A- | Black | AOUT2 |
+| Phase B+ | Red | BOUT1 |
+| Phase B- | Yellow | BOUT2 |
 
-#### Power Connections:
-```
-DRV8833 VCC → 3.3V (logic)
-DRV8833 VMOT → 5-12V (motor power)
-DRV8833 GND → GND
-```
+#### Power Connections
+| Source | Destination | Voltage | Purpose |
+|--------|-------------|---------|---------|
+| External PSU | DRV8833 VM | 5-12V | Motor power |
+| ESP32 3.3V | DRV8833 VCC | 3.3V | Logic power |
+| Common GND | All devices | 0V | Reference |
+
+#### Available Pins for Expansion
+**Free GPIO pins**: 13, 14, 25, 26, 27, 32, 33, 34, 35, 36, 39  
+**Input-only pins**: 34, 35, 36, 39 (perfect for limit switches)  
+**ADC capable**: 25, 26, 27, 32, 33, 34, 35, 36, 39 (for sensors)
+
+> **📋 Complete pin mapping**: See `PIN_MAPPING.md` for detailed pin assignments and expansion options
 
 ## BLE Services
 

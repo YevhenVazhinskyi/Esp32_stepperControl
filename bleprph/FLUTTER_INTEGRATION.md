@@ -8,13 +8,29 @@ This document provides complete integration guidelines for controlling a 2-phase
 
 ### ESP32 to DRV8833 Connections
 ```
-ESP32 GPIO21 → DRV8833 AIN1
-ESP32 GPIO19 → DRV8833 AIN2  
-ESP32 GPIO16 → DRV8833 BIN1
-ESP32 GPIO17 → DRV8833 BIN2
-ESP32 GPIO23 → DRV8833 SLEEP
-ESP32 GPIO22 → DRV8833 FAULT
+ESP32 GPIO21 → DRV8833 AIN1   (Motor Phase A Control)
+ESP32 GPIO19 → DRV8833 AIN2   (Motor Phase A Control)
+ESP32 GPIO16 → DRV8833 BIN1   (Motor Phase B Control)
+ESP32 GPIO17 → DRV8833 BIN2   (Motor Phase B Control)
+ESP32 GPIO23 → DRV8833 SLEEP  (Driver Enable/Disable)
+ESP32 GPIO22 → DRV8833 FAULT  (Fault Detection Input)
 ```
+
+### Motor Wire to DRV8833 Connections
+```
+Blue Wire (A+)   → DRV8833 AOUT1
+Black Wire (A-)  → DRV8833 AOUT2  
+Red Wire (B+)    → DRV8833 BOUT1
+Yellow Wire (B-) → DRV8833 BOUT2
+```
+
+### Pin Usage Summary
+**Total pins used:** 10 out of 30 available  
+**Motor control:** 6 pins  
+**LED control:** 4 pins (GPIO2, 4, 5, 18)  
+**Available for expansion:** 20 pins
+
+> **📋 Note**: See `PIN_MAPPING.md` for complete pin assignments and expansion possibilities
 
 ### Motor Specifications
 - **Step Angle**: 18 degrees (20 steps per full rotation)
