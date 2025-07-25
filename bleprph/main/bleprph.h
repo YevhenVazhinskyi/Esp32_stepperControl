@@ -24,6 +24,7 @@
 #include "nimble/ble.h"
 #include "modlog/modlog.h"
 #include "esp_peripheral.h"
+#include "stepper_motor.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
