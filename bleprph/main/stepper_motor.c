@@ -362,4 +362,63 @@ void stepper_motor_task(void *pvParameters) {
             vTaskDelay(pdMS_TO_TICKS(100)); // Longer delay when idle
         }
     }
+}
+
+// Test function: Move motor back and forth for hardware verification
+void stepper_motor_test_movement(stepper_motor_t *motor)
+{
+    ESP_LOGI(TAG, "Starting motor test - 10 seconds each direction");
+    
+    // Enable motor
+    gpio_set_level(motor->sleep_pin, 1);
+    vTaskDelay(pdMS_TO_TICKS(100)); // Wait for driver to wake up
+    
+    // Set test speed (faster for testing)
+    uint16_t test_speed = 20; // 20ms between steps (relatively fast)
+    
+    ESP_LOGI(TAG, "Phase 1: Moving forward for 10 seconds");
+    
+    // Calculate start time
+    TickType_t start_time = xTaskGetTickCount();
+    TickType_t ten_seconds = pdMS_TO_TICKS(10000); // 10 seconds
+    
+    // Move forward for 10 seconds
+    uint8_t step = 0;
+    while ((xTaskGetTickCount() - start_time) < ten_seconds) {
+        // Check for faults
+        if (stepper_motor_is_fault(motor)) {
+            ESP_LOGE(TAG, "Motor fault detected during test!");
+            break;
+        }
+        
+        // Set motor pins for current step (forward direction)
+        set_motor_step(motor, step);
+        step = (step + 1) % 4; // Move to next step
+        
+        vTaskDelay(pdMS_TO_TICKS(test_speed));
+    }
+    
+    ESP_LOGI(TAG, "Phase 2: Moving backward for 10 seconds");
+    
+    // Reset start time for backward movement
+    start_time = xTaskGetTickCount();
+    
+    // Move backward for 10 seconds  
+    while ((xTaskGetTickCount() - start_time) < ten_seconds) {
+        // Check for faults
+        if (stepper_motor_is_fault(motor)) {
+            ESP_LOGE(TAG, "Motor fault detected during test!");
+            break;
+        }
+        
+        // Set motor pins for current step (backward direction)
+        step = (step + 3) % 4; // Move to previous step (backward)
+        set_motor_step(motor, step);
+        
+        vTaskDelay(pdMS_TO_TICKS(test_speed));
+    }
+    
+    // Stop motor
+    motor_stop_pins(motor);
+    ESP_LOGI(TAG, "Motor test completed - motor stopped");
 } 

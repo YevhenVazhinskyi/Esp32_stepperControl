@@ -631,6 +631,10 @@ app_main(void)
     if (rc != ESP_OK) {
         ESP_LOGE(tag, "stepper_motor_init() failed");
     }
+    
+    /* Run motor hardware test - 10 seconds each direction */
+    ESP_LOGI(tag, "Running motor hardware test...");
+    run_motor_test(&g_motor_instance);
 
     /* Initialize command line interface to accept input from user */
     rc = scli_init();

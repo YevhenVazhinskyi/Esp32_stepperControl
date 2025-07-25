@@ -69,6 +69,7 @@ motor_status_t stepper_motor_get_status(stepper_motor_t *motor);
 int16_t stepper_motor_get_position(stepper_motor_t *motor);
 bool stepper_motor_is_fault(stepper_motor_t *motor);
 void stepper_motor_task(void *pvParameters);
+void stepper_motor_test_movement(stepper_motor_t *motor);
 
 #ifdef __cplusplus
 }

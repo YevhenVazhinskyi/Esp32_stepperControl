@@ -5,4 +5,5 @@ idf_component_register(SRCS "bleprph.h"
                             "main.c"
                             "gatt_svr.c"
                             "stepper_motor.c"
+                            "motor_test.c"
                     INCLUDE_DIRS ".")

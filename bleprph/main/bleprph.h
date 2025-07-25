@@ -57,6 +57,9 @@ int gatt_svr_init(void);
 #define MOTOR_SPEED_CHAR_UUID       "87654321-dcba-fedc-4321-ba0987654304"
 #define MOTOR_LIMITS_CHAR_UUID      "87654321-dcba-fedc-4321-ba0987654305"
 
+/** Motor Test Function **/
+void run_motor_test(stepper_motor_t *motor);
+
 #ifdef __cplusplus
 }
 #endif
