@@ -27,6 +27,7 @@
 #include "console/console.h"
 #include "services/gap/ble_svc_gap.h"
 #include "bleprph.h"
+#include "stepper_motor.h"
 
 #if CONFIG_EXAMPLE_EXTENDED_ADV
 static uint8_t ext_adv_pattern_1[] = {
@@ -38,6 +39,16 @@ static uint8_t ext_adv_pattern_1[] = {
 #endif
 
 static const char *tag = "NimBLE_BLE_PRPH";
+
+// Global motor instance
+stepper_motor_t g_motor_instance = {
+    .ain1_pin = GPIO_NUM_21,    // DRV8833 AIN1
+    .ain2_pin = GPIO_NUM_19,    // DRV8833 AIN2  
+    .bin1_pin = GPIO_NUM_16,    // DRV8833 BIN1 (changed from GPIO18 - conflict with LED4)
+    .bin2_pin = GPIO_NUM_17,    // DRV8833 BIN2 (changed from GPIO5 - conflict with LED3)
+    .sleep_pin = GPIO_NUM_23,   // DRV8833 SLEEP
+    .fault_pin = GPIO_NUM_22    // DRV8833 FAULT
+};
 static int bleprph_gap_event(struct ble_gap_event *event, void *arg);
 #if CONFIG_EXAMPLE_RANDOM_ADDR
 static uint8_t own_addr_type = BLE_OWN_ADDR_RANDOM;
@@ -614,6 +625,12 @@ app_main(void)
     ble_store_config_init();
 
     nimble_port_freertos_init(bleprph_host_task);
+
+    /* Initialize stepper motor */
+    rc = stepper_motor_init(&g_motor_instance);
+    if (rc != ESP_OK) {
+        ESP_LOGE(tag, "stepper_motor_init() failed");
+    }
 
     /* Initialize command line interface to accept input from user */
     rc = scli_init();

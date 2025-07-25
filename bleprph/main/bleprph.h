@@ -49,6 +49,14 @@ int gatt_svr_init(void);
 #define LED3_CHAR_UUID   "12345678-90ab-cdef-1234-567890abcd03"
 #define LED4_CHAR_UUID   "12345678-90ab-cdef-1234-567890abcd04"
 
+/** Stepper Motor Control **/
+#define MOTOR_SERVICE_UUID "87654321-dcba-fedc-4321-ba0987654321"
+#define MOTOR_POSITION_CHAR_UUID    "87654321-dcba-fedc-4321-ba0987654301"
+#define MOTOR_COMMAND_CHAR_UUID     "87654321-dcba-fedc-4321-ba0987654302"
+#define MOTOR_STATUS_CHAR_UUID      "87654321-dcba-fedc-4321-ba0987654303"
+#define MOTOR_SPEED_CHAR_UUID       "87654321-dcba-fedc-4321-ba0987654304"
+#define MOTOR_LIMITS_CHAR_UUID      "87654321-dcba-fedc-4321-ba0987654305"
+
 #ifdef __cplusplus
 }
 #endif

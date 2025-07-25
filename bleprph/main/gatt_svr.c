@@ -28,6 +28,7 @@
 #include "services/ans/ble_svc_ans.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "stepper_motor.h"
 
 /*** Forward declarations ***/
 static int gatt_svr_write(struct os_mbuf *om, uint16_t min_len, uint16_t max_len,
@@ -75,6 +76,43 @@ static uint16_t led3_handle;
 static uint16_t led4_handle;
 
 static const char *TAG = "LED_GATT";
+
+/*** Stepper Motor Service ***/
+// Motor Service UUID
+static const ble_uuid128_t motor_svc_uuid =
+    BLE_UUID128_INIT(0x21, 0x43, 0x65, 0x87, 0x09, 0xba, 0x21, 0x43,
+                     0xdc, 0xfe, 0xba, 0xdc, 0x21, 0x43, 0x65, 0x87);
+
+// Motor Characteristic UUIDs
+static const ble_uuid128_t motor_position_chr_uuid =
+    BLE_UUID128_INIT(0x01, 0x43, 0x65, 0x87, 0x09, 0xba, 0x21, 0x43,
+                     0xdc, 0xfe, 0xba, 0xdc, 0x21, 0x43, 0x65, 0x87);
+
+static const ble_uuid128_t motor_command_chr_uuid =
+    BLE_UUID128_INIT(0x02, 0x43, 0x65, 0x87, 0x09, 0xba, 0x21, 0x43,
+                     0xdc, 0xfe, 0xba, 0xdc, 0x21, 0x43, 0x65, 0x87);
+
+static const ble_uuid128_t motor_status_chr_uuid =
+    BLE_UUID128_INIT(0x03, 0x43, 0x65, 0x87, 0x09, 0xba, 0x21, 0x43,
+                     0xdc, 0xfe, 0xba, 0xdc, 0x21, 0x43, 0x65, 0x87);
+
+static const ble_uuid128_t motor_speed_chr_uuid =
+    BLE_UUID128_INIT(0x04, 0x43, 0x65, 0x87, 0x09, 0xba, 0x21, 0x43,
+                     0xdc, 0xfe, 0xba, 0xdc, 0x21, 0x43, 0x65, 0x87);
+
+static const ble_uuid128_t motor_limits_chr_uuid =
+    BLE_UUID128_INIT(0x05, 0x43, 0x65, 0x87, 0x09, 0xba, 0x21, 0x43,
+                     0xdc, 0xfe, 0xba, 0xdc, 0x21, 0x43, 0x65, 0x87);
+
+// Motor characteristic handles
+static uint16_t motor_position_handle;
+static uint16_t motor_command_handle;
+static uint16_t motor_status_handle;
+static uint16_t motor_speed_handle;
+static uint16_t motor_limits_handle;
+
+// Global motor instance
+extern stepper_motor_t g_motor_instance;
 
 // Function to initialize GPIO pins for LEDs
 static void led_gpio_init(void)
@@ -148,6 +186,128 @@ led_svc_access(uint16_t conn_handle, uint16_t attr_handle,
     }
 }
 
+// Motor service access callback
+static int
+motor_svc_access(uint16_t conn_handle, uint16_t attr_handle,
+                struct ble_gatt_access_ctxt *ctxt, void *arg)
+{
+    int rc;
+    
+    if (attr_handle == motor_position_handle) {
+        switch (ctxt->op) {
+        case BLE_GATT_ACCESS_OP_READ_CHR:
+            ESP_LOGI(TAG, "Motor position read; conn_handle=%d", conn_handle);
+            int16_t position = stepper_motor_get_position(&g_motor_instance);
+            rc = os_mbuf_append(ctxt->om, &position, sizeof(int16_t));
+            return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+            
+        case BLE_GATT_ACCESS_OP_WRITE_CHR:
+            ESP_LOGI(TAG, "Motor position write; conn_handle=%d", conn_handle);
+            int16_t new_position;
+            rc = gatt_svr_write(ctxt->om, sizeof(int16_t), sizeof(int16_t), &new_position, NULL);
+            if (rc == 0) {
+                stepper_motor_move_to_position(&g_motor_instance, new_position);
+            }
+            return rc;
+        }
+    }
+    else if (attr_handle == motor_command_handle) {
+        switch (ctxt->op) {
+        case BLE_GATT_ACCESS_OP_WRITE_CHR:
+            ESP_LOGI(TAG, "Motor command write; conn_handle=%d", conn_handle);
+            
+            // Command format: [command_type:1][parameter:2] = 3 bytes total
+            uint8_t cmd_data[3];
+            rc = gatt_svr_write(ctxt->om, 3, 3, cmd_data, NULL);
+            if (rc == 0) {
+                uint8_t command = cmd_data[0];
+                int16_t parameter = (cmd_data[2] << 8) | cmd_data[1]; // Little endian
+                
+                switch (command) {
+                    case MOTOR_CMD_STOP:
+                        stepper_motor_stop(&g_motor_instance);
+                        break;
+                    case MOTOR_CMD_MOVE_ABSOLUTE:
+                        stepper_motor_move_to_position(&g_motor_instance, parameter);
+                        break;
+                    case MOTOR_CMD_MOVE_RELATIVE:
+                        stepper_motor_move_relative(&g_motor_instance, parameter);
+                        break;
+                    case MOTOR_CMD_HOME:
+                        stepper_motor_home(&g_motor_instance);
+                        break;
+                    case MOTOR_CMD_SET_SPEED:
+                        stepper_motor_set_speed(&g_motor_instance, (uint16_t)parameter);
+                        break;
+                    case MOTOR_CMD_ENABLE:
+                        stepper_motor_enable(&g_motor_instance);
+                        break;
+                    case MOTOR_CMD_DISABLE:
+                        stepper_motor_disable(&g_motor_instance);
+                        break;
+                    default:
+                        ESP_LOGW(TAG, "Unknown motor command: %d", command);
+                        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+                }
+            }
+            return rc;
+        }
+    }
+    else if (attr_handle == motor_status_handle) {
+        switch (ctxt->op) {
+        case BLE_GATT_ACCESS_OP_READ_CHR:
+            ESP_LOGI(TAG, "Motor status read; conn_handle=%d", conn_handle);
+            
+            // Status format: [status:1][position:2][is_fault:1] = 4 bytes total
+            uint8_t status_data[4];
+            status_data[0] = (uint8_t)stepper_motor_get_status(&g_motor_instance);
+            int16_t pos = stepper_motor_get_position(&g_motor_instance);
+            status_data[1] = pos & 0xFF;        // Low byte
+            status_data[2] = (pos >> 8) & 0xFF; // High byte
+            status_data[3] = stepper_motor_is_fault(&g_motor_instance) ? 1 : 0;
+            
+            rc = os_mbuf_append(ctxt->om, status_data, sizeof(status_data));
+            return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+        }
+    }
+    else if (attr_handle == motor_speed_handle) {
+        switch (ctxt->op) {
+        case BLE_GATT_ACCESS_OP_READ_CHR:
+            ESP_LOGI(TAG, "Motor speed read; conn_handle=%d", conn_handle);
+            uint16_t speed = g_motor_instance.speed_delay_ms;
+            rc = os_mbuf_append(ctxt->om, &speed, sizeof(uint16_t));
+            return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+            
+        case BLE_GATT_ACCESS_OP_WRITE_CHR:
+            ESP_LOGI(TAG, "Motor speed write; conn_handle=%d", conn_handle);
+            uint16_t new_speed;
+            rc = gatt_svr_write(ctxt->om, sizeof(uint16_t), sizeof(uint16_t), &new_speed, NULL);
+            if (rc == 0) {
+                stepper_motor_set_speed(&g_motor_instance, new_speed);
+            }
+            return rc;
+        }
+    }
+    else if (attr_handle == motor_limits_handle) {
+        switch (ctxt->op) {
+        case BLE_GATT_ACCESS_OP_READ_CHR:
+            ESP_LOGI(TAG, "Motor limits read; conn_handle=%d", conn_handle);
+            
+            // Limits format: [min_pos:2][max_pos:2] = 4 bytes total
+            uint8_t limits_data[4];
+            limits_data[0] = g_motor_instance.min_position & 0xFF;
+            limits_data[1] = (g_motor_instance.min_position >> 8) & 0xFF;
+            limits_data[2] = g_motor_instance.max_position & 0xFF;
+            limits_data[3] = (g_motor_instance.max_position >> 8) & 0xFF;
+            
+            rc = os_mbuf_append(ctxt->om, limits_data, sizeof(limits_data));
+            return rc == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+        }
+    }
+    
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
 /*** Maximum number of characteristics with the notify flag ***/
 #define MAX_NOTIFY 5
 
@@ -203,6 +363,46 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
                 .access_cb = led_svc_access,
                 .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE,
                 .val_handle = &led4_handle,
+            }, {
+                0, /* No more characteristics in this service. */
+            }
+        },
+    },
+    {
+        /*** Stepper Motor Control Service ***/
+        .type = BLE_GATT_SVC_TYPE_PRIMARY,
+        .uuid = &motor_svc_uuid.u,
+        .characteristics = (struct ble_gatt_chr_def[])
+        { {
+                /*** Motor Position Characteristic ***/
+                .uuid = &motor_position_chr_uuid.u,
+                .access_cb = motor_svc_access,
+                .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_NOTIFY,
+                .val_handle = &motor_position_handle,
+            }, {
+                /*** Motor Command Characteristic ***/
+                .uuid = &motor_command_chr_uuid.u,
+                .access_cb = motor_svc_access,
+                .flags = BLE_GATT_CHR_F_WRITE,
+                .val_handle = &motor_command_handle,
+            }, {
+                /*** Motor Status Characteristic ***/
+                .uuid = &motor_status_chr_uuid.u,
+                .access_cb = motor_svc_access,
+                .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_NOTIFY,
+                .val_handle = &motor_status_handle,
+            }, {
+                /*** Motor Speed Characteristic ***/
+                .uuid = &motor_speed_chr_uuid.u,
+                .access_cb = motor_svc_access,
+                .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE,
+                .val_handle = &motor_speed_handle,
+            }, {
+                /*** Motor Limits Characteristic ***/
+                .uuid = &motor_limits_chr_uuid.u,
+                .access_cb = motor_svc_access,
+                .flags = BLE_GATT_CHR_F_READ,
+                .val_handle = &motor_limits_handle,
             }, {
                 0, /* No more characteristics in this service. */
             }

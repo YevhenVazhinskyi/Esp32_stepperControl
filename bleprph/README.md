@@ -1,126 +1,167 @@
-| Supported Targets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-H2 | ESP32-S3 |
-| ----------------- | ----- | -------- | -------- | -------- | -------- | --------- | -------- | -------- |
+# ESP32 BLE Peripheral with Stepper Motor Control
 
-# BLE Peripheral Example
+This example demonstrates BLE GATT Server functionality with LED control and stepper motor control via DRV8833 driver.
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+## Features
 
-This example creates GATT server and then starts advertising, waiting to be connected to a GATT client.
+- **BLE GATT Server**: NimBLE-based peripheral
+- **LED Control**: 4 individually controllable LEDs
+- **Stepper Motor Control**: 2-phase 4-wire stepper motor with DRV8833 driver
+- **Real-time Monitoring**: Position tracking and status updates
+- **Flutter Integration**: Complete mobile app integration guide
 
-It uses ESP32's Bluetooth controller and NimBLE stack based BLE host.
+## Hardware Requirements
 
-This example aims at understanding GATT database configuration, handling GATT reads and writes, handling subscribe events, understanding advertisement and SMP related NimBLE APIs.
+### ESP32 Development Board
+Any ESP32 board with sufficient GPIO pins
 
-It also demonstrates security features of NimBLE stack. SMP parameters like I/O capabilities of device, Bonding flag, MITM protection flag and Secure Connection only mode, Enabling Link Encryption etc., can be configured through menuconfig options.
+### Stepper Motor Setup
+- **Motor**: 2-phase 4-wire stepper motor (18° step angle)
+- **Driver**: DRV8833 dual motor driver
+- **Linear Actuator**: 90mm stroke lead screw assembly
 
-For RPA feature (currently Host based privacy feature is supported), use API `ble_hs_pvcy_rpa_config` to enable/disable host based privacy, `own_addr_type` needs to be set to `BLE_ADDR_RANDOM` to use this feature. Please include `ble_hs_pvcy.h` while using this API. As `ble_hs_pvcy_rpa_config` configures host privacy and sets address in controller, it is necessary to call this API after host-controller are synced (e.g. in `bleprph_on_sync` callback).
+### Wiring Connections
 
-To test this demo, any BLE scanner app can be used.
+#### DRV8833 to ESP32:
+```
+DRV8833 AIN1 → ESP32 GPIO21
+DRV8833 AIN2 → ESP32 GPIO19
+DRV8833 BIN1 → ESP32 GPIO16
+DRV8833 BIN2 → ESP32 GPIO17
+DRV8833 SLEEP → ESP32 GPIO23
+DRV8833 FAULT → ESP32 GPIO22
+```
 
-Note :
+#### LEDs to ESP32:
+```
+LED1 → ESP32 GPIO2
+LED2 → ESP32 GPIO4
+LED3 → ESP32 GPIO5
+LED4 → ESP32 GPIO18
+```
 
-* To install the dependency packages needed, please refer to the top level [README file](../../../README.md#running-test-python-script-pytest).
+#### Power Connections:
+```
+DRV8833 VCC → 3.3V (logic)
+DRV8833 VMOT → 5-12V (motor power)
+DRV8833 GND → GND
+```
 
-## How to Use Example
+## BLE Services
 
-Before project configuration and build, be sure to set the correct chip target using:
+### LED Control Service
+- **Service UUID**: `12345678-90ab-cdef-1234-567890abcdef`
+- **Characteristics**: 4 LED control characteristics (Read/Write)
 
+### Stepper Motor Service  
+- **Service UUID**: `87654321-dcba-fedc-4321-ba0987654321`
+- **Characteristics**:
+  - Position Control (Read/Write/Notify)
+  - Command Interface (Write)
+  - Status Monitoring (Read/Notify)
+  - Speed Control (Read/Write)
+  - Position Limits (Read)
+
+## Motor Specifications
+
+- **Step Angle**: 18 degrees (20 steps per full rotation)
+- **Stroke Length**: 90mm linear travel
+- **Resolution**: ~2.22 steps per millimeter
+- **Maximum Position**: ~200 steps
+- **Speed Control**: 1-1000ms delay between steps
+
+## Building and Flashing
+
+### Prerequisites
+- ESP-IDF v4.4 or later
+- Bluetooth enabled ESP32 module
+
+### Build Commands
 ```bash
-idf.py set-target <chip_name>
+idf.py set-target esp32
+idf.py menuconfig  # Configure Bluetooth settings if needed
+idf.py build
+idf.py flash monitor
 ```
 
-### Configure the project
+### Configuration Options
+- Enable Bluetooth in menuconfig
+- Configure log levels for debugging
+- Adjust motor parameters in `stepper_motor.h`
 
-Open the project configuration menu:
+## Mobile App Integration
 
+Complete Flutter integration documentation is available in `FLUTTER_INTEGRATION.md`, including:
+
+- BLE service discovery and connection
+- Characteristic definitions and data formats
+- Real-time position monitoring
+- Motor control commands
+- Status and fault monitoring
+- UI components and examples
+
+## Motor Control API
+
+### Commands Available:
+- **Move Absolute**: Move to specific position (0-200 steps)
+- **Move Relative**: Move by step count (+/- steps)
+- **Home**: Return to position 0
+- **Stop**: Immediate stop
+- **Set Speed**: Control movement speed (1-1000ms)
+- **Enable/Disable**: Power control
+
+### Safety Features:
+- Position limits enforcement
+- Fault detection via DRV8833 FAULT pin
+- Emergency stop capability
+- Power management
+
+## Monitoring and Debugging
+
+### Serial Output
+Monitor via serial connection for debug information:
 ```bash
-idf.py menuconfig
+idf.py monitor
 ```
 
-In the `Example Configuration` menu:
+### BLE Scanner Apps
+Use nRF Connect or similar apps to test BLE connectivity and characteristics.
 
-* Select I/O capabilities of device from `Example Configuration --> I/O Capability`, default is `Just_works`.
-* Enable/Disable other security related parameters `Bonding, MITM option, secure connection(SM SC)`.
+### Status Indicators
+- Motor status via BLE notifications
+- Fault detection and reporting
+- Real-time position updates
 
-### Build and Flash
+## Customization
 
-Run `idf.py -p PORT flash monitor` to build, flash and monitor the project.
+### Motor Parameters
+Edit `main/stepper_motor.h` to modify:
+- Steps per rotation
+- Stroke length
+- Steps per millimeter
+- GPIO pin assignments
 
-(To exit the serial monitor, type ``Ctrl-]``.)
-
-See the [Getting Started Guide](https://idf.espressif.com/) for full steps to configure and use ESP-IDF to build projects.
-
-## Example Output
-
-There is this console output when bleprph is connected and characteristic is read:
-
-```
-I (118) BTDM_INIT: BT controller compile version [fe7ced0]
-I (118) system_api: Base MAC address is not set, read default base MAC address from BLK0 of EFUSE
-W (128) phy_init: failed to load RF calibration data (0xffffffff), falling back to full calibration
-I (268) phy: phy_version: 4100, 6fa5e27, Jan 25 2019, 17:02:06, 0, 2
-I (508) NimBLE_BLE_PRPH: BLE Host Task Started
-I (508) uart: queue free spaces: 8
-GAP procedure initiated: stop advertising.
-Device Address: xx:xx:xx:xx:xx:xx
-GAP procedure initiated: advertise; disc_mode=2 adv_channel_map=0 own_addr_type=0 adv_filter_policy=0 adv_itvl_min=0 adv_itvl_max=0
-connection established; status=0 handle=0 our_ota_addr_type=0 our_ota_addr=xx:xx:xx:xx:xx:xx our_id_addr_type=0 our_id_addr=xx:xx:xx:xx:xx:xx peer_ota_addr_type=1 peer_ota_addr=xx:xx:xx:xx:xx:xx peer_id_addr_type=1 peer_id_addr=xx:xx:xx:xx:xx:xx conn_itvl=39 conn_latency=0 supervision_timeout=500 encrypted=0 authenticated=0 bonded=0
-
-connection updated; status=0 handle=0 our_ota_addr_type=0 our_ota_addr=xx:xx:xx:xx:xx:xx our_id_addr_type=0 our_id_addr=xx:xx:xx:xx:xx:xx peer_ota_addr_type=1 peer_ota_addr=xx:xx:xx:xx:xx:xx peer_id_addr_type=1 peer_id_addr=xx:xx:xx:xx:xx:xx conn_itvl=6 conn_latency=0 supervision_timeout=500 encrypted=0 authenticated=0 bonded=0
-
-I (50888) NimBLE_BLE_PRPH: PASSKEY_ACTION_EVENT started
-
-I (50888) NimBLE_BLE_PRPH: Passkey on device's display: xxxxxx
-I (50888) NimBLE_BLE_PRPH: Accept or reject the passkey through console in this format -> key Y or key N
-key Y
-I (50898) NimBLE_BLE_PRPH: ble_sm_inject_io result: 0
-
-encryption change event; status=0 handle=0 our_ota_addr_type=0 our_ota_addr=xx:xx:xx:xx:xx:xx our_id_addr_type=0 our_id_addr=xx:xx:xx:xx:xx:xx peer_ota_addr_type=1 peer_ota_addr=xx:xx:xx:xx:xx:xx peer_id_addr_type=1
-peer_id_addr=xx:xx:xx:xx:xx:xx conn_itvl=6 conn_latency=0 supervision_timeout=500 encrypted=1 authenticated=1 bonded=1
-
-connection updated; status=0 handle=0 our_ota_addr_type=0 our_ota_addr=xx:xx:xx:xx:xx:xx our_id_addr_type=0 our_id_addr=xx:xx:xx:xx:xx:xx
-peer_ota_addr_type=1 peer_ota_addr=xx:xx:xx:xx:xx:xx peer_id_addr_type=1 peer_id_addr=xx:xx:xx:xx:xx:xx conn_itvl=39 conn_latency=0 supervision_timeout=500 encrypted=1 authenticated=1 bonded=1
-
-subscribe event; conn_handle=1 attr_handle=19 reason=1 prevn=0 curn=1 previ=0 curi=0
-Subscribe to attribute (19) successful
-subscribe event; conn_handle=1 attr_handle=25 reason=1 prevn=0 curn=1 previ=0 curi=0
-Subscribe to attribute (25) successful
-GATT procedure initiated: notify; att_handle=25
-Notification sent successfully
-```
-
-## Note
-* NVS support is not yet integrated to bonding. So, for now, bonding is not persistent across reboot.
-
-The following configuration flags can be adjusted to significantly reduce RAM usage in your ESP-IDF project while retaining basic BLE functionality.
-----------------------------------------------------------------------------------------------
-| Config Option                                    || Old → New Value || RAM Saved (Bytes)   |
-|--------------------------------------------------||------------------||--------------------|
-| CONFIG_BT_NIMBLE_SM_SC                           || y → n            || 2016               |
-| CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_ENCRYPTION       || y → n            || 32                 |
-| CONFIG_BT_NIMBLE_GATT_MAX_PROCS                  || 4 → 2            || 112                |
-| CONFIG_BT_NIMBLE_MAX_CONNECTIONS                 || 3 → 1            || 480                |
-| CONFIG_BT_NIMBLE_MAX_BONDS                       || 3 → 1            || 448                |
-| CONFIG_BT_NIMBLE_MAX_CCCDS                       || 8 → 1            || 112                |
-| CONFIG_BT_NIMBLE_ENABLE_CONN_REATTEMPT           || y → n            || 256                |
-| CONFIG_BT_NIMBLE_TRANSPORT_EVT_COUNT             || 30 → 15          || 240                |
-| CONFIG_BT_NIMBLE_SECURITY_ENABLE                 || y → n            || 2048               |
-| CONFIG_SPI_FLASH_ROM_IMPL                        || n → y            || 9804               |
-| CONFIG_SPI_FLASH_SUPPORT_ISSI_CHIP               || y → n            || 8                  |
-| CONFIG_SPI_FLASH_SUPPORT_MXIC_CHIP               || y → n            || 132                |
-| CONFIG_SPI_FLASH_SUPPORT_GD_CHIP                 || y → n            || 640                |
-| CONFIG_SPI_FLASH_SUPPORT_WINBOND_CHIP            || y → n            || 0                  |
-| CONFIG_SPI_FLASH_SUPPORT_BOYA_CHIP               || y → n            || 132                |
-| CONFIG_SPI_FLASH_SUPPORT_TH_CHIP                 || y → n            || 128                |
-| CONFIG_SPI_FLASH_ENABLE_ENCRYPTED_READ_WRITE     || y → n            || 696                |
-| CONFIG_VFS_SUPPORT_TERMIOS                       || y → n            || 424                |
-| CONFIG_VFS_SUPPORT_IO                            || y → n            || 3000               |
-| CONFIG_COMPILER_OPTIMIZATION_SIZE                || n → y            || 8912               |
-| CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_DISABLE  || n → y            || 8456               |
-| CONFIG_ESP_COEX_SW_COEXIST_ENABLE                || y → n            || 896                |
-| CONFIG_LOG_DEFAULT_LEVEL_NONE                    || n → y            || 2568               |
-----------------------------------------------------------------------------------------------
+### BLE Configuration
+Edit `main/bleprph.h` and `main/gatt_svr.c` to modify:
+- Service UUIDs
+- Characteristic properties
+- Data formats
 
 ## Troubleshooting
 
-For any technical queries, please open an [issue](https://github.com/espressif/esp-idf/issues) on GitHub. We will get back to you soon.
+### Common Issues:
+1. **Motor not moving**: Check wiring and power supply
+2. **BLE connection failed**: Verify ESP32 Bluetooth configuration
+3. **Position inaccurate**: Calibrate steps-per-mm for your lead screw
+4. **Motor stalls**: Increase speed delay or check motor ratings
+5. **Fault detected**: Check motor connections and power supply
+
+### Debug Steps:
+1. Monitor serial output for error messages
+2. Test individual GPIO pins with multimeter
+3. Verify BLE advertising with scanner app
+4. Check motor power supply voltage and current
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the original ESP-IDF license for details.
