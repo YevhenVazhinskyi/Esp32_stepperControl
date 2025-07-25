@@ -1,8 +1,24 @@
-# BLE Peripheral Example Walkthrough
+# ESP32 BLE Peripheral with Stepper Motor Control - Complete Walkthrough
 
 ## Introduction
 
-In this tutorial, the ble peripheral example code for the espressif chipsets is reviewed. This example aims at understanding GATT database configuration, handling GATT reads and writes, handling subscribe events, and understanding advertisement and SMP-related NimBLE APIs.It also demonstrates the security features of the NimBLE stack. SMP parameters like I/O capabilities of the device, Bonding flag, MITM protection flag and Secure Connection only mode, Enabling Link Encryption, etc., can be configured through menuconfig options.
+This comprehensive tutorial covers the ESP32 BLE Peripheral example enhanced with stepper motor control functionality. The system demonstrates:
+
+- **Original BLE Features**: GATT database configuration, handling reads/writes, subscribe events, advertisement, and SMP-related NimBLE APIs
+- **Stepper Motor Control**: Wireless control of 2-phase 4-wire stepper motor via DRV8833 driver
+- **LED Feedback System**: Visual indication of received BLE commands
+- **Security Features**: Bonding, MITM protection, Secure Connection, and Link Encryption
+- **Mobile Integration**: Complete Flutter app support for remote control
+
+### New Features Added
+- **Modular Stepper Motor Driver** (`stepper_motor.h/c`)
+- **BLE Motor Control Service** with 5 characteristics
+- **LED Command Feedback** - Visual confirmation of received commands
+- **Real-time Position Monitoring** via BLE notifications
+- **Safety Features** - Position limits, fault detection, emergency stop
+- **Thread-safe Operation** using FreeRTOS tasks and queues
+
+> **📋 For detailed stepper motor functionality**: See [`stepper_motor_walkthrough.md`](stepper_motor_walkthrough.md)
 
 ## Includes
 

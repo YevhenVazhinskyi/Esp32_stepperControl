@@ -140,6 +140,45 @@ static void led_control(int gpio_pin, uint8_t state)
     ESP_LOGI(TAG, "LED on GPIO %d set to %d", gpio_pin, state);
 }
 
+// Function to flash LED for command feedback
+static void flash_command_led(int gpio_pin, int duration_ms)
+{
+    gpio_set_level(gpio_pin, 1);  // Turn on LED
+    vTaskDelay(pdMS_TO_TICKS(duration_ms));
+    gpio_set_level(gpio_pin, 0);  // Turn off LED
+}
+
+// Flash LED to indicate different motor commands
+static void indicate_motor_command(motor_command_t command)
+{
+    switch (command) {
+        case MOTOR_CMD_MOVE_ABSOLUTE:
+            flash_command_led(LED1_GPIO, 200);  // LED1 - 200ms flash for absolute move
+            break;
+        case MOTOR_CMD_MOVE_RELATIVE:
+            flash_command_led(LED2_GPIO, 200);  // LED2 - 200ms flash for relative move
+            break;
+        case MOTOR_CMD_HOME:
+            flash_command_led(LED3_GPIO, 500);  // LED3 - 500ms flash for home command
+            break;
+        case MOTOR_CMD_STOP:
+            flash_command_led(LED4_GPIO, 100);  // LED4 - 100ms flash for stop command
+            break;
+        case MOTOR_CMD_SET_SPEED:
+            flash_command_led(LED1_GPIO, 100);  // LED1 - quick flash for speed change
+            flash_command_led(LED1_GPIO, 100);  // Double flash
+            break;
+        case MOTOR_CMD_ENABLE:
+            gpio_set_level(LED2_GPIO, 1);       // LED2 - solid on for enable
+            break;
+        case MOTOR_CMD_DISABLE:
+            gpio_set_level(LED2_GPIO, 0);       // LED2 - off for disable
+            break;
+        default:
+            break;
+    }
+}
+
 // LED service access callback
 static int
 led_svc_access(uint16_t conn_handle, uint16_t attr_handle,
@@ -206,6 +245,8 @@ motor_svc_access(uint16_t conn_handle, uint16_t attr_handle,
             int16_t new_position;
             rc = gatt_svr_write(ctxt->om, sizeof(int16_t), sizeof(int16_t), &new_position, NULL);
             if (rc == 0) {
+                // Flash LED1 to indicate position command received
+                flash_command_led(LED1_GPIO, 200);
                 stepper_motor_move_to_position(&g_motor_instance, new_position);
             }
             return rc;
@@ -222,6 +263,9 @@ motor_svc_access(uint16_t conn_handle, uint16_t attr_handle,
             if (rc == 0) {
                 uint8_t command = cmd_data[0];
                 int16_t parameter = (cmd_data[2] << 8) | cmd_data[1]; // Little endian
+                
+                // Flash LED to indicate command received
+                indicate_motor_command((motor_command_t)command);
                 
                 switch (command) {
                     case MOTOR_CMD_STOP:
@@ -283,6 +327,10 @@ motor_svc_access(uint16_t conn_handle, uint16_t attr_handle,
             uint16_t new_speed;
             rc = gatt_svr_write(ctxt->om, sizeof(uint16_t), sizeof(uint16_t), &new_speed, NULL);
             if (rc == 0) {
+                // Double flash LED1 to indicate speed change
+                flash_command_led(LED1_GPIO, 100);
+                vTaskDelay(pdMS_TO_TICKS(50));
+                flash_command_led(LED1_GPIO, 100);
                 stepper_motor_set_speed(&g_motor_instance, new_speed);
             }
             return rc;
