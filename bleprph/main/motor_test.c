@@ -6,7 +6,7 @@
 static const char *TAG = "MOTOR_TEST";
 
 // Test configuration
-#define TEST_ENABLED 1          // Set to 0 to disable test
+#define TEST_ENABLED 0          // Set to 0 to disable test
 #define TEST_SPEED_MS 20        // Speed for test (ms between steps)
 #define TEST_DURATION_SEC 10    // Duration for each direction
 

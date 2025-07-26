@@ -232,6 +232,9 @@ motor_svc_access(uint16_t conn_handle, uint16_t attr_handle,
 {
     int rc;
     
+    // Flash LED1 for ANY motor BLE command (read or write)
+    flash_command_led(LED1_GPIO, 100);  // Quick 100ms flash
+    
     if (attr_handle == motor_position_handle) {
         switch (ctxt->op) {
         case BLE_GATT_ACCESS_OP_READ_CHR:
