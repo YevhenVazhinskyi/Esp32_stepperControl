@@ -1,17 +1,15 @@
-set(srcs "main.c"
-         "gatt_svr.c")
-
 idf_component_register(
     SRCS 
-        "main.c"
+        "src/ble_peripheral.c"
+        "src/gatt_svr.c"
     INCLUDE_DIRS 
-        "."
+        "include"
     REQUIRES 
-        nvs_flash
+        bt
+        nimble
+        driver
         esp_log
         freertos
         stepper_motor
-        ble_peripheral
-        motor_testing
         common
-)
+) 

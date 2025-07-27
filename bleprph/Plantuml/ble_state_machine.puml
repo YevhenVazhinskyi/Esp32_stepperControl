@@ -1,0 +1,109 @@
+@startuml BLE_State_Machine
+!theme plain
+
+title ESP32 Stepper Motor Controller - BLE Connection State Machine
+
+[*] --> BLE_INIT : System Boot
+
+state BLE_INIT {
+    BLE_INIT : entry / ESP_LOGI("Initializing BLE")
+    BLE_INIT : do / nimble_port_init()
+    BLE_INIT : do / Configure host stack
+    BLE_INIT : do / Initialize GATT services
+    BLE_INIT : do / Set device name
+    BLE_INIT : exit / nimble_port_freertos_init()
+}
+
+state BLE_ADVERTISING {
+    BLE_ADVERTISING : entry / ESP_LOGI("Advertising started")
+    BLE_ADVERTISING : entry / ble_gap_adv_start()
+    BLE_ADVERTISING : do / Broadcast device name
+    BLE_ADVERTISING : do / Send service UUIDs
+    BLE_ADVERTISING : do / Wait for connections
+    BLE_ADVERTISING : do / Update TX power level
+}
+
+state BLE_CONNECTED {
+    BLE_CONNECTED : entry / conn_handle = event.conn_handle
+    BLE_CONNECTED : entry / is_connected = true
+    BLE_CONNECTED : entry / ESP_LOGI("Connection established")
+    BLE_CONNECTED : do / Process GATT requests
+    BLE_CONNECTED : do / Handle characteristic writes
+    BLE_CONNECTED : do / Send notifications
+    BLE_CONNECTED : do / Monitor connection parameters
+}
+
+state BLE_DISCONNECTED {
+    BLE_DISCONNECTED : entry / conn_handle = BLE_HS_CONN_HANDLE_NONE
+    BLE_DISCONNECTED : entry / is_connected = false
+    BLE_DISCONNECTED : entry / ESP_LOGI("Connection terminated")
+    BLE_DISCONNECTED : do / Clean up resources
+    BLE_DISCONNECTED : exit / Restart advertising
+}
+
+state BLE_ERROR {
+    BLE_ERROR : entry / ESP_LOGE("BLE Error")
+    BLE_ERROR : do / Log error details
+    BLE_ERROR : do / Attempt recovery
+    BLE_ERROR : exit / Reset BLE stack if needed
+}
+
+' Main BLE transitions
+BLE_INIT --> BLE_ADVERTISING : Initialization successful
+BLE_INIT --> BLE_ERROR : Initialization failed
+
+BLE_ADVERTISING --> BLE_CONNECTED : Connection request accepted
+BLE_ADVERTISING --> BLE_ERROR : Advertising failed
+BLE_ADVERTISING --> BLE_ADVERTISING : ADV_COMPLETE event / Restart advertising
+
+BLE_CONNECTED --> BLE_DISCONNECTED : Client disconnected
+BLE_CONNECTED --> BLE_DISCONNECTED : Connection timeout
+BLE_CONNECTED --> BLE_ERROR : Connection error
+
+BLE_DISCONNECTED --> BLE_ADVERTISING : Auto-restart advertising
+BLE_ERROR --> BLE_ADVERTISING : Recovery successful
+
+' GATT Service substates within BLE_CONNECTED
+state BLE_CONNECTED {
+    state LED_SERVICE : Handle LED control requests
+    state MOTOR_SERVICE : Handle motor control requests
+    state NOTIFY_UPDATES : Send position/status updates
+    
+    LED_SERVICE : LED write / gpio_set_level(led_pin, value)
+    LED_SERVICE : LED read / return led_states[index]
+    
+    MOTOR_SERVICE : Position write / stepper_motor_move_to_position()
+    MOTOR_SERVICE : Command write / xQueueSend(motor_command_queue)
+    MOTOR_SERVICE : Status read / return motor status data
+    MOTOR_SERVICE : Speed write / stepper_motor_set_speed()
+    
+    NOTIFY_UPDATES : Position changed / ble_gatts_chr_updated()
+    NOTIFY_UPDATES : Status changed / Send notification
+    
+    [*] --> LED_SERVICE : LED characteristic access
+    [*] --> MOTOR_SERVICE : Motor characteristic access
+    [*] --> NOTIFY_UPDATES : Subscription active
+}
+
+' Event-driven transitions
+BLE_ADVERTISING : BLE_GAP_EVENT_CONNECT / Check connection status
+BLE_CONNECTED : BLE_GAP_EVENT_DISCONNECT / Log disconnect reason
+BLE_CONNECTED : BLE_GAP_EVENT_CONN_UPDATE / Update parameters
+BLE_CONNECTED : BLE_GAP_EVENT_SUBSCRIBE / Enable notifications
+BLE_CONNECTED : BLE_GAP_EVENT_MTU / Log MTU size
+
+' Connection parameters
+note right of BLE_ADVERTISING : Advertising Parameters:\n• Interval: 20-40ms\n• Device name: "ESP32_StepperMotor"\n• Services: LED + Motor\n• Connectable & Discoverable
+
+note left of BLE_CONNECTED : GATT Services:\n• LED Control Service\n  - 4 LED characteristics\n• Motor Control Service\n  - Position (R/W/N)\n  - Command (W)\n  - Status (R/N)\n  - Speed (R/W)
+
+note bottom of BLE_DISCONNECTED : Auto-Recovery:\n• Immediate restart advertising\n• No user intervention needed\n• Maintains service state\n• Ready for new connections
+
+' Self-transitions for continuous operations
+BLE_ADVERTISING --> BLE_ADVERTISING : No connection [continue advertising]
+BLE_CONNECTED --> BLE_CONNECTED : GATT request received [process and respond]
+
+' Error recovery
+BLE_ERROR --> BLE_INIT : Critical error / Full stack restart
+
+@enduml 

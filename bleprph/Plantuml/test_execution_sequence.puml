@@ -1,0 +1,358 @@
+@startuml Test_Execution_Sequence
+!theme plain
+
+title ESP32 Stepper Motor Controller - Test Suite Execution Sequence
+
+participant "app_main()" as Main
+participant "Test\nSuite" as TestSuite
+participant "Hardware\nTest" as HWTest
+participant "Movement\nTest" as MoveTest  
+participant "Accuracy\nTest" as AccTest
+participant "Speed\nTest" as SpeedTest
+participant "Motor\nComponent" as Motor
+participant "GPIO\nDriver" as GPIO
+participant "LED\nController" as LED
+
+== Test Suite Initialization ==
+Main -> Main : Check CONFIG_ENABLE_MOTOR_TESTS
+activate Main
+
+opt CONFIG_ENABLE_MOTOR_TESTS defined
+    Main -> TestSuite : run_motor_tests()
+    activate TestSuite
+    
+    TestSuite -> TestSuite : ESP_LOGI("=== Starting Motor Test Suite ===")
+    TestSuite -> Main : system_status = SYSTEM_STATUS_TESTING
+    TestSuite -> TestSuite : Initialize test counters
+    TestSuite -> TestSuite : Set test timeout limits
+    
+    == Parallel Test Execution ==
+    par Hardware Test Thread
+        TestSuite -> HWTest : motor_test_hardware(&g_motor)
+        activate HWTest
+        
+        HWTest -> HWTest : ESP_LOGI("Running hardware tests...")
+        
+        == GPIO Configuration Test ==
+        HWTest -> Motor : Check motor GPIO pin configuration
+        activate Motor
+        Motor -> Motor : Verify AIN1, AIN2, BIN1, BIN2 pins
+        Motor -> Motor : Validate SLEEP pin control
+        Motor -> Motor : Test FAULT pin reading
+        Motor --> HWTest : GPIO config status
+        deactivate Motor
+        
+        == Driver Response Test ==
+        HWTest -> Motor : stepper_motor_enable(&g_motor)
+        activate Motor
+        Motor -> GPIO : gpio_set_level(sleep_pin, 1)
+        Motor -> Motor : Wait 100ms for driver ready
+        Motor -> Motor : ESP_LOGI("Motor driver enabled")
+        Motor --> HWTest : Enable status
+        deactivate Motor
+        
+        HWTest -> Motor : Test basic pin toggling
+        activate Motor
+        Motor -> Motor : set_motor_step(&g_motor, 0)
+        Motor -> GPIO : Apply step 0 pin states
+        Motor -> GPIO : Verify output levels
+        Motor -> Motor : set_motor_step(&g_motor, 1)
+        Motor -> GPIO : Apply step 1 pin states
+        Motor -> GPIO : Verify output levels
+        Motor --> HWTest : Pin test results
+        deactivate Motor
+        
+        HWTest -> Motor : stepper_motor_disable(&g_motor)
+        activate Motor
+        Motor -> GPIO : gpio_set_level(sleep_pin, 0)
+        Motor -> Motor : ESP_LOGI("Motor driver disabled")
+        deactivate Motor
+        
+        alt Hardware test passed
+            HWTest -> HWTest : ESP_LOGI("Hardware test: PASSED")
+            HWTest -> LED : Flash success pattern
+            HWTest --> TestSuite : ESP_OK
+        else Hardware test failed
+            HWTest -> HWTest : ESP_LOGE("Hardware test: FAILED")
+            HWTest -> LED : Flash error pattern
+            HWTest --> TestSuite : ESP_FAIL
+        end
+        deactivate HWTest
+        
+    and Movement Test Thread
+        TestSuite -> MoveTest : motor_test_movement(&g_motor)
+        activate MoveTest
+        
+        MoveTest -> MoveTest : ESP_LOGI("Running movement tests...")
+        
+        == Basic Movement Validation ==
+        MoveTest -> Motor : stepper_motor_enable(&g_motor)
+        activate Motor
+        Motor -> GPIO : gpio_set_level(sleep_pin, 1)
+        Motor -> Motor : Wait for driver ready
+        deactivate Motor
+        
+        MoveTest -> Motor : stepper_motor_set_speed(&g_motor, 100)
+        activate Motor
+        Motor -> Motor : speed_delay_ms = 100
+        Motor -> Motor : ESP_LOGI("Speed set to 100ms")
+        deactivate Motor
+        
+        == Forward Movement Test ==
+        MoveTest -> Motor : stepper_motor_move_relative(&g_motor, 10)
+        activate Motor
+        Motor -> Motor : target_position = current_position + 10
+        Motor -> Motor : is_moving = true
+        
+        loop Movement execution (10 steps forward)
+            Motor -> GPIO : Apply step sequence
+            Motor -> Motor : current_position++
+            Motor -> Motor : vTaskDelay(100ms)
+        end
+        
+        Motor -> Motor : is_moving = false
+        Motor --> MoveTest : Movement complete
+        deactivate Motor
+        
+        MoveTest -> Motor : stepper_motor_get_position(&g_motor)
+        activate Motor
+        Motor --> MoveTest : current_position = 10
+        deactivate Motor
+        
+        alt Position correct
+            MoveTest -> MoveTest : ESP_LOGI("Forward movement: PASSED")
+        else Position incorrect
+            MoveTest -> MoveTest : ESP_LOGE("Forward movement: FAILED")
+        end
+        
+        == Backward Movement Test ==
+        MoveTest -> Motor : stepper_motor_move_relative(&g_motor, -5)
+        activate Motor
+        Motor -> Motor : target_position = current_position - 5
+        Motor -> Motor : is_moving = true
+        
+        loop Movement execution (5 steps backward)
+            Motor -> GPIO : Apply reverse step sequence
+            Motor -> Motor : current_position--
+            Motor -> Motor : vTaskDelay(100ms)
+        end
+        
+        Motor -> Motor : is_moving = false
+        Motor --> MoveTest : Movement complete
+        deactivate Motor
+        
+        MoveTest -> Motor : stepper_motor_get_position(&g_motor)
+        activate Motor
+        Motor --> MoveTest : current_position = 5
+        deactivate Motor
+        
+        == Homing Test ==
+        MoveTest -> Motor : stepper_motor_home(&g_motor)
+        activate Motor
+        Motor -> Motor : target_position = 0
+        Motor -> Motor : is_moving = true
+        
+        loop Movement to home (5 steps backward)
+            Motor -> GPIO : Apply reverse step sequence
+            Motor -> Motor : current_position--
+            Motor -> Motor : vTaskDelay(100ms)
+        end
+        
+        Motor -> Motor : is_moving = false
+        Motor -> Motor : ESP_LOGI("Homing complete")
+        Motor --> MoveTest : Homing complete
+        deactivate Motor
+        
+        alt All movements correct
+            MoveTest -> MoveTest : ESP_LOGI("Movement test: PASSED")
+            MoveTest --> TestSuite : ESP_OK
+        else Movement errors detected
+            MoveTest -> MoveTest : ESP_LOGE("Movement test: FAILED")
+            MoveTest --> TestSuite : ESP_FAIL
+        end
+        deactivate MoveTest
+        
+    and Accuracy Test Thread
+        TestSuite -> AccTest : motor_test_position_accuracy(&g_motor)
+        activate AccTest
+        
+        AccTest -> AccTest : ESP_LOGI("Running position accuracy tests...")
+        AccTest -> AccTest : Test positions: [0, 25, 50, 100, -25, -50]
+        AccTest -> AccTest : accuracy_errors = 0
+        
+        loop For each test position
+            AccTest -> AccTest : target_pos = next_position
+            AccTest -> AccTest : ESP_LOGI("Testing position: %d", target_pos)
+            
+            AccTest -> Motor : stepper_motor_move_to_position(&g_motor, target_pos)
+            activate Motor
+            Motor -> Motor : target_position = target_pos
+            Motor -> Motor : is_moving = true
+            
+            loop Movement to target
+                Motor -> GPIO : Apply appropriate step sequence
+                Motor -> Motor : Update current_position
+                Motor -> Motor : vTaskDelay(speed_delay_ms)
+                
+                alt Target reached
+                    Motor -> Motor : is_moving = false
+                    break
+                end
+            end
+            Motor --> AccTest : Movement complete
+            deactivate Motor
+            
+            AccTest -> Motor : stepper_motor_get_position(&g_motor)
+            activate Motor
+            Motor --> AccTest : actual_position
+            deactivate Motor
+            
+            AccTest -> AccTest : position_error = abs(actual_pos - target_pos)
+            
+            alt position_error <= 1
+                AccTest -> AccTest : ESP_LOGI("Position %d: PASSED (error: %d)", target_pos, position_error)
+            else position_error > 1
+                AccTest -> AccTest : ESP_LOGE("Position %d: FAILED (error: %d)", target_pos, position_error)
+                AccTest -> AccTest : accuracy_errors++
+            end
+        end
+        
+        AccTest -> Motor : stepper_motor_home(&g_motor)
+        activate Motor
+        Motor -> Motor : Return to home for cleanup
+        deactivate Motor
+        
+        alt accuracy_errors == 0
+            AccTest -> AccTest : ESP_LOGI("Position accuracy test: PASSED")
+            AccTest --> TestSuite : ESP_OK
+        else accuracy_errors > 0
+            AccTest -> AccTest : ESP_LOGE("Position accuracy test: FAILED (%d errors)", accuracy_errors)
+            AccTest --> TestSuite : ESP_FAIL
+        end
+        deactivate AccTest
+        
+    and Speed Test Thread
+        TestSuite -> SpeedTest : motor_test_speed_variations(&g_motor)
+        activate SpeedTest
+        
+        SpeedTest -> SpeedTest : ESP_LOGI("Running speed variation tests...")
+        SpeedTest -> SpeedTest : Test speeds: [1ms, 10ms, 50ms, 100ms, 500ms, 1000ms]
+        SpeedTest -> SpeedTest : speed_test_errors = 0
+        
+        loop For each test speed
+            SpeedTest -> SpeedTest : test_speed = next_speed
+            SpeedTest -> SpeedTest : ESP_LOGI("Testing speed: %d ms", test_speed)
+            
+            SpeedTest -> Motor : stepper_motor_set_speed(&g_motor, test_speed)
+            activate Motor
+            Motor -> Motor : speed_delay_ms = test_speed
+            Motor -> Motor : Validate speed limits
+            deactivate Motor
+            
+            SpeedTest -> SpeedTest : start_time = xTaskGetTickCount()
+            
+            SpeedTest -> Motor : stepper_motor_move_relative(&g_motor, 20)
+            activate Motor
+            Motor -> Motor : target_position = current_position + 20
+            Motor -> Motor : is_moving = true
+            
+            loop Movement execution (20 steps)
+                Motor -> GPIO : Apply step sequence
+                Motor -> Motor : current_position++
+                Motor -> Motor : vTaskDelay(test_speed)
+            end
+            
+            Motor -> Motor : is_moving = false
+            Motor --> SpeedTest : Movement complete
+            deactivate Motor
+            
+            SpeedTest -> SpeedTest : end_time = xTaskGetTickCount()
+            SpeedTest -> SpeedTest : actual_duration = (end_time - start_time) * portTICK_PERIOD_MS
+            SpeedTest -> SpeedTest : expected_duration = 20 * test_speed
+            SpeedTest -> SpeedTest : timing_error = abs(actual_duration - expected_duration)
+            
+            alt timing_error <= (expected_duration * 0.1)
+                SpeedTest -> SpeedTest : ESP_LOGI("Speed %dms: PASSED (error: %dms)", test_speed, timing_error)
+            else timing_error > threshold
+                SpeedTest -> SpeedTest : ESP_LOGE("Speed %dms: FAILED (error: %dms)", test_speed, timing_error)
+                SpeedTest -> SpeedTest : speed_test_errors++
+            end
+            
+            == Return to Start Position ==
+            SpeedTest -> Motor : stepper_motor_move_relative(&g_motor, -20)
+            activate Motor
+            Motor -> Motor : Return to start position
+            deactivate Motor
+        end
+        
+        alt speed_test_errors == 0
+            SpeedTest -> SpeedTest : ESP_LOGI("Speed variation test: PASSED")
+            SpeedTest --> TestSuite : ESP_OK
+        else speed_test_errors > 0
+            SpeedTest -> SpeedTest : ESP_LOGE("Speed variation test: FAILED (%d errors)", speed_test_errors)
+            SpeedTest --> TestSuite : ESP_FAIL
+        end
+        deactivate SpeedTest
+    end
+    
+    == Results Analysis ==
+    TestSuite -> TestSuite : Collect all test results
+    TestSuite -> TestSuite : total_tests = 4
+    TestSuite -> TestSuite : passed_tests = count_passed_results()
+    
+    TestSuite -> TestSuite : ESP_LOGI("Test Results: %d/%d passed", passed_tests, total_tests)
+    
+    alt passed_tests == total_tests
+        TestSuite -> TestSuite : ESP_LOGI("=== All Motor Tests Passed! ===")
+        TestSuite -> LED : Flash success pattern (3 times)
+        activate LED
+        loop Success pattern
+            LED -> GPIO : gpio_set_level(LED1-4, 1)
+            LED -> LED : vTaskDelay(100ms)
+            LED -> GPIO : gpio_set_level(LED1-4, 0)
+            LED -> LED : vTaskDelay(100ms)
+        end
+        deactivate LED
+        TestSuite -> TestSuite : final_result = ESP_OK
+    else passed_tests < total_tests
+        TestSuite -> TestSuite : ESP_LOGE("=== Motor Test Suite Failed ===")
+        TestSuite -> TestSuite : ESP_LOGE("Failed tests: %d", total_tests - passed_tests)
+        TestSuite -> LED : Flash error pattern
+        activate LED
+        loop Error pattern
+            LED -> GPIO : gpio_set_level(LED1-4, 1)
+            LED -> LED : vTaskDelay(500ms)
+            LED -> GPIO : gpio_set_level(LED1-4, 0)
+            LED -> LED : vTaskDelay(200ms)
+        end
+        deactivate LED
+        TestSuite -> TestSuite : final_result = ESP_FAIL
+    end
+    
+    == Test Cleanup ==
+    TestSuite -> TestSuite : Ensure motor is in safe state
+    TestSuite -> Motor : stepper_motor_home(&g_motor)
+    activate Motor
+    Motor -> Motor : Return to home position
+    Motor -> Motor : Wait for homing completion
+    deactivate Motor
+    
+    TestSuite -> Motor : stepper_motor_disable(&g_motor)
+    activate Motor
+    Motor -> GPIO : gpio_set_level(sleep_pin, 0)
+    Motor -> Motor : ESP_LOGI("Motor disabled after tests")
+    deactivate Motor
+    
+    TestSuite -> Main : system_status = SYSTEM_STATUS_READY
+    TestSuite -> TestSuite : ESP_LOGI("Test suite cleanup complete")
+    
+    TestSuite --> Main : final_result
+    deactivate TestSuite
+end
+
+Main -> Main : Continue with normal system operation
+deactivate Main
+
+note over Main, LED : Test execution complete\nSystem returns to normal operation\nMotor hardware validated
+
+@enduml 

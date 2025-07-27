@@ -1,178 +1,268 @@
-# ESP32 BLE Peripheral with Stepper Motor Control
+# ESP32 Stepper Motor BLE Controller
 
-This example demonstrates BLE GATT Server functionality with LED control and stepper motor control via DRV8833 driver.
+A modular, industry-standard ESP32 firmware for controlling stepper motors via Bluetooth Low Energy (BLE). This project demonstrates modern embedded software architecture with clean separation of concerns, comprehensive testing, and professional documentation.
 
-## Features
+## 🏗️ Architecture Overview
 
-- **BLE GATT Server**: NimBLE-based peripheral
-- **LED Control**: 4 individually controllable LEDs
-- **Stepper Motor Control**: 2-phase 4-wire stepper motor with DRV8833 driver
-- **Real-time Monitoring**: Position tracking and status updates
-- **Flutter Integration**: Complete mobile app integration guide
+This project follows ESP-IDF component-based architecture with the following modules:
 
-## Hardware Requirements
+```
+├── components/
+│   ├── stepper_motor/       # Motor driver and control logic
+│   ├── ble_peripheral/      # BLE stack and GATT services
+│   ├── motor_testing/       # Comprehensive test suite
+│   └── common/             # Shared types and configurations
+├── main/                   # Application entry point and coordination
+└── docs/                   # Documentation and tutorials
+```
 
-### ESP32 Development Board
-Any ESP32 board with sufficient GPIO pins
+## ✨ Features
 
-### Stepper Motor Setup
-- **Motor**: 2-phase 4-wire stepper motor (18° step angle)
-- **Driver**: DRV8833 dual motor driver
-- **Linear Actuator**: 90mm stroke lead screw assembly
+### Core Functionality
+- **Stepper Motor Control**: Full-step motor control with DRV8833 driver
+- **BLE Remote Control**: Comprehensive BLE peripheral with custom GATT services
+- **Position Tracking**: Absolute and relative positioning with fault detection
+- **Visual Feedback**: LED indicators for status and commands
+- **Comprehensive Testing**: Hardware validation and performance testing
 
-### Complete Pin Mapping
+### Technical Features
+- **Modular Architecture**: Component-based design following industry best practices
+- **Thread-Safe Operation**: FreeRTOS task-based motor control with command queuing
+- **Real-time Monitoring**: BLE notifications for position and status updates
+- **Fault Detection**: Hardware fault monitoring with automatic recovery
+- **Configurable Hardware**: Centralized pin configuration for easy porting
 
-#### GPIO Pin Assignments Summary
-| GPIO | Function | Direction | Device/Component |
-|------|----------|-----------|------------------|
-| GPIO2 | LED1 Control | Output | On-board LED |
-| GPIO4 | LED2 Control | Output | External LED |
-| GPIO5 | LED3 Control | Output | External LED |
-| GPIO16 | DRV8833 BIN1 | Output | Motor Phase B |
-| GPIO17 | DRV8833 BIN2 | Output | Motor Phase B |
-| GPIO18 | LED4 Control | Output | External LED |
-| GPIO19 | DRV8833 AIN2 | Output | Motor Phase A |
-| GPIO21 | DRV8833 AIN1 | Output | Motor Phase A |
-| GPIO22 | DRV8833 FAULT | Input | Fault Detection |
-| GPIO23 | DRV8833 SLEEP | Output | Driver Enable |
-
-#### Motor Wire Connections
-| Motor Wire | Color | DRV8833 Terminal |
-|------------|-------|------------------|
-| Phase A+ | Blue | AOUT1 |
-| Phase A- | Black | AOUT2 |
-| Phase B+ | Red | BOUT1 |
-| Phase B- | Yellow | BOUT2 |
-
-#### Power Connections
-| Source | Destination | Voltage | Purpose |
-|--------|-------------|---------|---------|
-| External PSU | DRV8833 VM | 5-12V | Motor power |
-| ESP32 3.3V | DRV8833 VCC | 3.3V | Logic power |
-| Common GND | All devices | 0V | Reference |
-
-#### Available Pins for Expansion
-**Free GPIO pins**: 13, 14, 25, 26, 27, 32, 33, 34, 35, 36, 39  
-**Input-only pins**: 34, 35, 36, 39 (perfect for limit switches)  
-**ADC capable**: 25, 26, 27, 32, 33, 34, 35, 36, 39 (for sensors)
-
-> **📋 Complete pin mapping**: See `PIN_MAPPING.md` for detailed pin assignments and expansion options
-
-## BLE Services
-
-### LED Control Service
-- **Service UUID**: `12345678-90ab-cdef-1234-567890abcdef`
-- **Characteristics**: 4 LED control characteristics (Read/Write)
-
-### Stepper Motor Service  
-- **Service UUID**: `87654321-dcba-fedc-4321-ba0987654321`
-- **Characteristics**:
-  - Position Control (Read/Write/Notify)
-  - Command Interface (Write)
-  - Status Monitoring (Read/Notify)
-  - Speed Control (Read/Write)
-  - Position Limits (Read)
-
-## Motor Specifications
-
-- **Step Angle**: 18 degrees (20 steps per full rotation)
-- **Stroke Length**: 90mm linear travel
-- **Resolution**: ~2.22 steps per millimeter
-- **Maximum Position**: ~200 steps
-- **Speed Control**: 1-1000ms delay between steps
-
-## Building and Flashing
+## 🚀 Quick Start
 
 ### Prerequisites
-- ESP-IDF v4.4 or later
-- Bluetooth enabled ESP32 module
+- ESP-IDF v4.4+ installed and configured
+- ESP32 development board
+- DRV8833 motor driver
+- Stepper motor (NEMA 17 recommended)
+- LEDs for visual feedback
 
-### Build Commands
+### Hardware Connections
+
+#### Motor Driver (DRV8833)
+```
+ESP32 Pin    | DRV8833 Pin | Description
+-------------|-------------|-------------
+GPIO 26      | AIN1        | Motor Phase A1
+GPIO 27      | AIN2        | Motor Phase A2
+GPIO 14      | BIN1        | Motor Phase B1
+GPIO 12      | BIN2        | Motor Phase B2
+GPIO 13      | SLEEP       | Driver Enable
+GPIO 25      | FAULT       | Fault Detection
+3.3V         | VCC         | Logic Power
+GND          | GND         | Ground
+```
+
+#### Status LEDs
+```
+ESP32 Pin    | LED         | Function
+-------------|-------------|---------------------------
+GPIO 2       | LED1        | Motor activity indicator
+GPIO 4       | LED2        | Motor enable status
+GPIO 5       | LED3        | Home command indicator
+GPIO 18      | LED4        | Stop command indicator
+```
+
+### Building and Flashing
 ```bash
-idf.py set-target esp32
-idf.py menuconfig  # Configure Bluetooth settings if needed
+# Clone the repository
+git clone <repository-url>
+cd esp32-stepper-motor-ble
+
+# Configure ESP-IDF environment
+. $IDF_PATH/export.sh
+
+# Build the project
 idf.py build
+
+# Flash to ESP32
 idf.py flash monitor
 ```
 
-### Configuration Options
-- Enable Bluetooth in menuconfig
-- Configure log levels for debugging
-- Adjust motor parameters in `stepper_motor.h`
-
-## Mobile App Integration
-
-Complete Flutter integration documentation is available in `FLUTTER_INTEGRATION.md`, including:
-
-- BLE service discovery and connection
-- Characteristic definitions and data formats
-- Real-time position monitoring
-- Motor control commands
-- Status and fault monitoring
-- UI components and examples
-
-## Motor Control API
-
-### Commands Available:
-- **Move Absolute**: Move to specific position (0-200 steps)
-- **Move Relative**: Move by step count (+/- steps)
-- **Home**: Return to position 0
-- **Stop**: Immediate stop
-- **Set Speed**: Control movement speed (1-1000ms)
-- **Enable/Disable**: Power control
-
-### Safety Features:
-- Position limits enforcement
-- Fault detection via DRV8833 FAULT pin
-- Emergency stop capability
-- Power management
-
-## Monitoring and Debugging
-
-### Serial Output
-Monitor via serial connection for debug information:
+### Initial Testing
 ```bash
-idf.py monitor
+# Run with motor tests enabled
+idf.py menuconfig  # Enable CONFIG_ENABLE_MOTOR_TESTS
+idf.py build flash monitor
 ```
 
-### BLE Scanner Apps
-Use nRF Connect or similar apps to test BLE connectivity and characteristics.
+## 🔧 Configuration
 
-### Status Indicators
-- Motor status via BLE notifications
-- Fault detection and reporting
-- Real-time position updates
+### Hardware Configuration
+Modify pin assignments in `components/common/include/common_types.h`:
 
-## Customization
+```c
+// Motor driver pins
+#define DEFAULT_MOTOR_AIN1      GPIO_NUM_26
+#define DEFAULT_MOTOR_AIN2      GPIO_NUM_27
+// ... etc
+
+// LED pins  
+#define DEFAULT_LED1_GPIO       GPIO_NUM_2
+// ... etc
+```
 
 ### Motor Parameters
-Edit `main/stepper_motor.h` to modify:
-- Steps per rotation
-- Stroke length
-- Steps per millimeter
-- GPIO pin assignments
+Adjust motor specifications in `components/stepper_motor/include/stepper_motor.h`:
+
+```c
+#define STEPS_PER_REVOLUTION    200     // 1.8° motor
+#define THREAD_PITCH_MM        2.0     // Lead screw pitch
+#define STROKE_LENGTH_MM       50      // Travel distance
+```
 
 ### BLE Configuration
-Edit `main/bleprph.h` and `main/gatt_svr.c` to modify:
-- Service UUIDs
-- Characteristic properties
-- Data formats
+Customize BLE settings in `components/common/include/common_types.h`:
 
-## Troubleshooting
+```c
+#define DEVICE_NAME             "ESP32_StepperMotor"
+#define FIRMWARE_VERSION        "1.0.0"
+#define BLE_ADV_INTERVAL_MIN    0x20    // 20ms
+```
 
-### Common Issues:
-1. **Motor not moving**: Check wiring and power supply
-2. **BLE connection failed**: Verify ESP32 Bluetooth configuration
-3. **Position inaccurate**: Calibrate steps-per-mm for your lead screw
-4. **Motor stalls**: Increase speed delay or check motor ratings
-5. **Fault detected**: Check motor connections and power supply
+## 📱 BLE Interface
 
-### Debug Steps:
-1. Monitor serial output for error messages
-2. Test individual GPIO pins with multimeter
-3. Verify BLE advertising with scanner app
-4. Check motor power supply voltage and current
+### Services and Characteristics
 
-## License
+#### LED Control Service
+- **Service UUID**: `12345678-90ab-cdef-1234-567890abcdef`
+- Control 4 individual LEDs via Read/Write characteristics
 
-This project is licensed under the Apache License 2.0 - see the original ESP-IDF license for details.
+#### Motor Control Service  
+- **Service UUID**: `87654321-abcd-ef90-1234-567890abcdef`
+- **Position**: Read current position, write target position
+- **Command**: Send motor commands (stop, home, enable, etc.)
+- **Status**: Read motor status and fault information
+- **Speed**: Read/write motor speed (step delay)
+
+### Motor Commands
+Send commands as 3-byte packets: `[command:1][parameter:2]`
+
+| Command | Value | Parameter | Description |
+|---------|-------|-----------|-------------|
+| STOP | 0 | - | Stop motor immediately |
+| MOVE_ABSOLUTE | 1 | position | Move to absolute position |
+| MOVE_RELATIVE | 2 | steps | Move relative steps |
+| HOME | 3 | - | Return to position 0 |
+| SET_SPEED | 4 | delay_ms | Set step delay |
+| ENABLE | 5 | - | Enable motor driver |
+| DISABLE | 6 | - | Disable motor driver |
+
+## 🧪 Testing
+
+### Motor Test Suite
+```c
+#include "motor_test.h"
+
+// Run comprehensive test suite
+motor_test_suite(&motor);
+
+// Or run individual tests
+motor_test_hardware(&motor);
+motor_test_movement(&motor);
+motor_test_position_accuracy(&motor);
+motor_test_speed_variations(&motor);
+```
+
+### Test Coverage
+- **Hardware Test**: GPIO pins, enable/disable, fault detection
+- **Movement Test**: Bidirectional movement for 10 seconds each
+- **Position Accuracy**: Multiple target positions with tolerance checking
+- **Speed Variations**: 5 different speeds from 5ms to 100ms delays
+
+## 📚 Component Documentation
+
+Each component includes detailed documentation:
+
+- [Stepper Motor Component](components/stepper_motor/README.md)
+- [BLE Peripheral Component](components/ble_peripheral/README.md)
+- [Motor Testing Component](components/motor_testing/README.md)
+- [Common Types Component](components/common/README.md)
+
+## 🔧 Development
+
+### Adding New Features
+1. Create new component in `components/` directory
+2. Add `CMakeLists.txt` with dependencies
+3. Include headers in `main/main.c`
+4. Update documentation
+
+### Code Style
+- Follow ESP-IDF coding standards
+- Use descriptive function and variable names
+- Include comprehensive error handling
+- Add ESP_LOG statements for debugging
+
+### Testing
+- All components include unit tests
+- Hardware-in-the-loop testing available
+- CI/CD pipeline validates builds
+
+## 🤝 Integration
+
+### Mobile App Integration
+This firmware is designed to work with BLE client applications:
+- Discover device by name "ESP32_StepperMotor"
+- Connect and explore GATT services
+- Write to characteristics to control motor
+- Subscribe to notifications for real-time updates
+
+### Industrial Integration
+- Modular design allows easy integration into larger systems
+- Standard ESP-IDF component structure
+- Well-defined APIs for each subsystem
+- Comprehensive error reporting
+
+## 🛠️ Troubleshooting
+
+### Common Issues
+
+**Motor not moving:**
+- Check wiring connections
+- Verify power supply to DRV8833
+- Monitor fault pin status
+- Check ESP_LOG output for errors
+
+**BLE connection issues:**
+- Ensure device is advertising
+- Check BLE client compatibility
+- Verify characteristic UUIDs
+- Monitor connection events in logs
+
+**Position accuracy problems:**
+- Check for mechanical binding
+- Verify step sequence timing
+- Calibrate motor parameters
+- Run position accuracy test
+
+### Debug Information
+```bash
+# Monitor ESP_LOG output
+idf.py monitor
+
+# Filter specific component logs
+idf.py monitor | grep "STEPPER_MOTOR"
+```
+
+## 📄 License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- ESP-IDF framework by Espressif Systems
+- NimBLE Bluetooth stack
+- FreeRTOS real-time operating system
+- Community contributions and feedback
+
+## 📧 Support
+
+For questions, issues, or contributions:
+- Open an issue on GitHub
+- Check component documentation
+- Review ESP_LOG output for debugging
+- Consult ESP-IDF documentation for framework details

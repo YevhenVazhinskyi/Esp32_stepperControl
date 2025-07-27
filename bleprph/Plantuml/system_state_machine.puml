@@ -1,0 +1,77 @@
+@startuml System_State_Machine
+!theme plain
+
+title ESP32 Stepper Motor Controller - System State Machine
+
+[*] --> SYSTEM_INIT : Power On / Reset
+
+state SYSTEM_INIT {
+    SYSTEM_INIT : entry / ESP_LOGI("System Starting")
+    SYSTEM_INIT : do / Initialize NVS
+    SYSTEM_INIT : do / Initialize Motor
+    SYSTEM_INIT : do / Initialize BLE
+    SYSTEM_INIT : exit / ESP_LOGI("Initialization Complete")
+}
+
+state SYSTEM_READY {
+    SYSTEM_READY : entry / system_status = READY
+    SYSTEM_READY : do / Monitor motor faults
+    SYSTEM_READY : do / Check BLE connections
+    SYSTEM_READY : do / Log status every 10s
+    SYSTEM_READY : exit / Stop monitoring
+}
+
+state SYSTEM_RUNNING {
+    SYSTEM_RUNNING : entry / Start main application task
+    SYSTEM_RUNNING : do / Process motor commands
+    SYSTEM_RUNNING : do / Handle BLE communications
+    SYSTEM_RUNNING : do / Update status indicators
+}
+
+state SYSTEM_ERROR {
+    SYSTEM_ERROR : entry / ESP_LOGE("System Error")
+    SYSTEM_ERROR : do / Wait 5 seconds
+    SYSTEM_ERROR : do / Check fault status
+    SYSTEM_ERROR : exit / ESP_LOGI("Attempting recovery")
+}
+
+state SYSTEM_TESTING {
+    SYSTEM_TESTING : entry / ESP_LOGI("Starting Tests")
+    SYSTEM_TESTING : do / Run hardware tests
+    SYSTEM_TESTING : do / Run movement tests
+    SYSTEM_TESTING : do / Run accuracy tests
+    SYSTEM_TESTING : do / Run speed tests
+    SYSTEM_TESTING : exit / ESP_LOGI("Tests Complete")
+}
+
+' Main system transitions
+SYSTEM_INIT --> SYSTEM_READY : All initialization successful
+SYSTEM_INIT --> SYSTEM_ERROR : Initialization failed
+
+SYSTEM_READY --> SYSTEM_RUNNING : Main task created
+SYSTEM_READY --> SYSTEM_ERROR : Motor fault detected
+SYSTEM_READY --> SYSTEM_TESTING : CONFIG_ENABLE_MOTOR_TESTS
+
+SYSTEM_RUNNING --> SYSTEM_ERROR : Critical fault
+SYSTEM_RUNNING --> SYSTEM_READY : System reset requested
+
+SYSTEM_ERROR --> SYSTEM_READY : Fault cleared
+SYSTEM_ERROR --> SYSTEM_ERROR : Fault persists [after 5s]
+
+SYSTEM_TESTING --> SYSTEM_READY : All tests passed
+SYSTEM_TESTING --> SYSTEM_ERROR : Test failed
+
+' Error conditions
+SYSTEM_READY : Motor fault detected / system_status = ERROR
+SYSTEM_RUNNING : stepper_motor_is_fault() == true / Stop operations
+
+' Recovery conditions  
+SYSTEM_ERROR : !stepper_motor_is_fault() / Resume normal operation
+
+note right of SYSTEM_INIT : Initialization Sequence:\n1. NVS Flash\n2. Motor GPIO setup\n3. BLE stack start\n4. GATT services\n5. Task creation
+
+note right of SYSTEM_ERROR : Error Recovery:\n• 5 second wait\n• Check fault pin\n• Attempt restart\n• Log error details
+
+note bottom of SYSTEM_TESTING : Test Suite:\n• Hardware validation\n• Movement tests\n• Position accuracy\n• Speed variations\n• Complete suite
+
+@enduml 

@@ -1,0 +1,142 @@
+@startuml System_Startup_Activity
+!theme plain
+
+title ESP32 Stepper Motor Controller - System Startup Activity Flow
+
+|System|
+start
+:System Power On / Reset;
+:ESP_LOGI("ESP32 Stepper Motor Controller Starting");
+:Display Device Name and Version;
+
+|NVS Initialization|
+:ESP_LOGI("Initializing NVS...");
+:Call init_nvs();
+:nvs_flash_init();
+
+if (NVS initialization successful?) then (yes)
+    :ESP_LOGI("NVS initialized");
+else (no)
+    :ESP_LOGE("Failed to initialize NVS");
+    :ESP_ERROR_CHECK(nvs_flash_erase());
+    :Retry nvs_flash_init();
+    if (Retry successful?) then (yes)
+        :Continue;
+    else (no)
+        :System halt;
+        stop
+    endif
+endif
+
+|Motor Initialization|
+:ESP_LOGI("Initializing stepper motor...");
+:Call init_motor();
+
+partition "Motor Setup" {
+    :Configure GPIO pins (AIN1, AIN2, BIN1, BIN2, SLEEP, FAULT);
+    :Set pin modes (OUTPUT/INPUT);
+    :Initialize motor state structure;
+    :Set default speed and position limits;
+    :Create motor command queue;
+    :Create motor control task;
+}
+
+if (Motor initialization successful?) then (yes)
+    :ESP_LOGI("Motor initialized successfully");
+else (no)
+    :ESP_LOGE("Motor initialization failed");
+    :System halt;
+    stop
+endif
+
+|BLE Initialization|
+:ESP_LOGI("Initializing BLE peripheral...");
+:Call init_ble();
+
+partition "BLE Setup" {
+    :nimble_port_init();
+    :Configure BLE host stack;
+    :Initialize GATT services;
+    :Set device name and appearance;
+    :Start BLE host task;
+    :Begin advertising;
+}
+
+if (BLE initialization successful?) then (yes)
+    :ESP_LOGI("BLE initialized successfully");
+    :Set motor reference for GATT server;
+else (no)
+    :ESP_LOGE("BLE initialization failed");
+    :System halt;
+    stop
+endif
+
+|System Ready|
+:system_status = SYSTEM_STATUS_READY;
+:ESP_LOGI("===== System Initialization Complete =====");
+
+if (CONFIG_ENABLE_MOTOR_TESTS enabled?) then (yes)
+    |Test Execution|
+    :ESP_LOGI("Starting Motor Test Suite");
+    :system_status = SYSTEM_STATUS_TESTING;
+    
+    fork
+        :Run hardware tests;
+    fork again
+        :Run movement tests;
+    fork again
+        :Run position accuracy tests;
+    fork again
+        :Run speed variation tests;
+    end fork
+    
+    if (All tests passed?) then (yes)
+        :ESP_LOGI("All Motor Tests Passed!");
+    else (no)
+        :ESP_LOGE("Motor Test Suite Failed");
+    endif
+    :system_status = SYSTEM_STATUS_READY;
+else (no)
+    :Skip motor tests;
+endif
+
+|Task Creation|
+:Create main application task;
+:xTaskCreate(app_main_task, "app_main_task", 4096, NULL, 5, NULL);
+
+|System Running|
+:system_status = SYSTEM_STATUS_RUNNING;
+:ESP_LOGI("===== System Running =====");
+:ESP_LOGI("BLE device name: %s", BLE_DEVICE_NAME);
+:ESP_LOGI("Connect with a BLE client to control the motor");
+:ESP_LOGI("LED indicators ready");
+
+fork
+    |Main Task|
+    :Start main application loop;
+    :Monitor system status;
+    :Check motor faults;
+    :Log periodic status;
+fork again
+    |Motor Task|
+    :Start motor control loop;
+    :Process command queue;
+    :Generate step sequences;
+    :Update position tracking;
+fork again
+    |BLE Task|
+    :Start BLE host processing;
+    :Handle connections;
+    :Process GATT requests;
+    :Send notifications;
+end fork
+
+:System operational and ready for commands;
+
+note right : Initialization Sequence:\n1. NVS Flash setup\n2. GPIO configuration\n3. Motor driver setup\n4. BLE stack initialization\n5. Task creation\n6. System ready state
+
+note left : Error Handling:\n• Any initialization failure\n  causes system halt\n• NVS has retry mechanism\n• Motor and BLE failures\n  are critical errors
+
+stop
+
+@enduml 

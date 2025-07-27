@@ -1,0 +1,104 @@
+@startuml Motor_State_Machine
+!theme plain
+
+title ESP32 Stepper Motor Controller - Motor State Machine
+
+[*] --> MOTOR_DISABLED : System Boot
+
+state MOTOR_DISABLED {
+    MOTOR_DISABLED : entry / gpio_set_level(sleep_pin, 0)
+    MOTOR_DISABLED : entry / motor_stop_pins()
+    MOTOR_DISABLED : entry / is_moving = false
+    MOTOR_DISABLED : do / All pins LOW
+    MOTOR_DISABLED : do / No step generation
+}
+
+state MOTOR_IDLE {
+    MOTOR_IDLE : entry / motor_stop_pins()
+    MOTOR_IDLE : entry / is_moving = false
+    MOTOR_IDLE : do / Monitor command queue
+    MOTOR_IDLE : do / Check fault pin
+    MOTOR_IDLE : do / Power saving mode
+}
+
+state MOTOR_MOVING {
+    MOTOR_MOVING : entry / is_moving = true
+    MOTOR_MOVING : do / Generate step sequence
+    MOTOR_MOVING : do / Update current_position
+    MOTOR_MOVING : do / Check target reached
+    MOTOR_MOVING : do / Apply speed_delay_ms
+    MOTOR_MOVING : exit / motor_stop_pins()
+}
+
+state MOTOR_ERROR {
+    MOTOR_ERROR : entry / ESP_LOGE("Motor Fault!")
+    MOTOR_ERROR : entry / is_moving = false
+    MOTOR_ERROR : entry / motor_stop_pins()
+    MOTOR_ERROR : do / Wait 1 second
+    MOTOR_ERROR : do / Check fault status
+}
+
+' State transitions
+MOTOR_DISABLED --> MOTOR_IDLE : MOTOR_CMD_ENABLE / gpio_set_level(sleep_pin, 1)
+MOTOR_IDLE --> MOTOR_DISABLED : MOTOR_CMD_DISABLE
+MOTOR_IDLE --> MOTOR_MOVING : Movement command received
+MOTOR_IDLE --> MOTOR_ERROR : stepper_motor_is_fault() == true
+
+MOTOR_MOVING --> MOTOR_IDLE : Target position reached
+MOTOR_MOVING --> MOTOR_IDLE : MOTOR_CMD_STOP received  
+MOTOR_MOVING --> MOTOR_ERROR : Fault detected during movement
+MOTOR_MOVING --> MOTOR_DISABLED : MOTOR_CMD_DISABLE
+
+MOTOR_ERROR --> MOTOR_IDLE : Fault cleared
+MOTOR_ERROR --> MOTOR_ERROR : Fault persists [after 1s]
+MOTOR_ERROR --> MOTOR_DISABLED : MOTOR_CMD_DISABLE
+
+' Command processing substates
+state MOTOR_MOVING {
+    state MOVE_ABSOLUTE : Calculate steps to target
+    state MOVE_RELATIVE : Add steps to current position  
+    state MOVE_HOME : Set target_position = 0
+    state STEP_FORWARD : current_step = (current_step + 1) % 4
+    state STEP_BACKWARD : current_step = (current_step + 3) % 4
+    state SET_PINS : set_motor_step(motor, current_step)
+    state APPLY_DELAY : vTaskDelay(speed_delay_ms)
+    
+    [*] --> MOVE_ABSOLUTE : MOTOR_CMD_MOVE_ABSOLUTE
+    [*] --> MOVE_RELATIVE : MOTOR_CMD_MOVE_RELATIVE  
+    [*] --> MOVE_HOME : MOTOR_CMD_HOME
+    
+    MOVE_ABSOLUTE --> STEP_FORWARD : current_position < target_position
+    MOVE_ABSOLUTE --> STEP_BACKWARD : current_position > target_position
+    MOVE_RELATIVE --> STEP_FORWARD : steps > 0
+    MOVE_RELATIVE --> STEP_BACKWARD : steps < 0
+    MOVE_HOME --> STEP_BACKWARD : current_position > 0
+    
+    STEP_FORWARD --> SET_PINS : direction = true
+    STEP_BACKWARD --> SET_PINS : direction = false
+    SET_PINS --> APPLY_DELAY
+    APPLY_DELAY --> MOVE_ABSOLUTE : Check position again
+    APPLY_DELAY --> MOVE_RELATIVE : Check position again
+    APPLY_DELAY --> MOVE_HOME : Check position again
+}
+
+' Speed control
+MOTOR_IDLE : MOTOR_CMD_SET_SPEED / speed_delay_ms = parameter
+MOTOR_MOVING : MOTOR_CMD_SET_SPEED / speed_delay_ms = parameter
+
+' Position limits
+MOTOR_MOVING : position > max_position / target_position = max_position
+MOTOR_MOVING : position < min_position / target_position = min_position
+
+' Command queue events
+note right of MOTOR_IDLE : Command Queue Processing:\n• xQueueReceive(motor_command_queue)\n• 10ms timeout\n• Process motor_cmd_msg_t\n• Update LED indicators
+
+note left of MOTOR_MOVING : Step Sequence (Full Step):\nStep 0: AIN1=1, AIN2=0, BIN1=1, BIN2=0\nStep 1: AIN1=0, AIN2=1, BIN1=1, BIN2=0\nStep 2: AIN1=0, AIN2=1, BIN1=0, BIN2=1\nStep 3: AIN1=1, AIN2=0, BIN1=0, BIN2=1
+
+note bottom of MOTOR_ERROR : Fault Conditions:\n• DRV8833 FAULT pin LOW\n• Overcurrent protection\n• Thermal shutdown\n• Short circuit detection
+
+' Self transitions
+MOTOR_IDLE --> MOTOR_IDLE : No command received [every 10ms]
+MOTOR_MOVING --> MOTOR_MOVING : Position != target [continue stepping]
+MOTOR_ERROR --> MOTOR_ERROR : Fault still present [every 1s]
+
+@enduml 

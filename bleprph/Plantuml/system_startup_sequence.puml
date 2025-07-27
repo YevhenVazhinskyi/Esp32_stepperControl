@@ -1,0 +1,202 @@
+@startuml System_Startup_Sequence
+!theme plain
+
+title ESP32 Stepper Motor Controller - System Startup Sequence
+
+participant "ESP32\nBootloader" as Boot
+participant "app_main()" as Main
+participant "NVS\nFlash" as NVS
+participant "Motor\nComponent" as Motor
+participant "BLE\nComponent" as BLE
+participant "GATT\nServer" as GATT
+participant "Test\nSuite" as Test
+participant "Main\nTask" as Task
+
+== System Power On ==
+Boot -> Main : esp_main()
+activate Main
+
+Main -> Main : ESP_LOGI("System Starting")
+Main -> Main : Display device info
+
+== NVS Initialization ==
+Main -> NVS : init_nvs()
+activate NVS
+
+NVS -> NVS : nvs_flash_init()
+alt NVS initialization successful
+    NVS --> Main : ESP_OK
+    Main -> Main : ESP_LOGI("NVS initialized")
+else NVS needs erase
+    NVS -> NVS : ESP_ERROR_CHECK(nvs_flash_erase())
+    NVS -> NVS : nvs_flash_init() [retry]
+    alt Retry successful
+        NVS --> Main : ESP_OK
+    else Retry failed
+        NVS --> Main : ESP_FAIL
+        Main -> Main : System halt
+        Main --> Boot : return [CRITICAL ERROR]
+    end
+end
+deactivate NVS
+
+== Motor Initialization ==
+Main -> Motor : init_motor()
+activate Motor
+
+Motor -> Motor : ESP_LOGI("Initializing stepper motor")
+Motor -> Motor : stepper_motor_init(&g_motor)
+
+Motor -> Motor : Configure GPIO pins
+note right : AIN1, AIN2, BIN1, BIN2\nSLEEP, FAULT pins
+
+Motor -> Motor : gpio_config(&io_conf)
+Motor -> Motor : Set pin modes and initial states
+
+Motor -> Motor : Create motor command queue
+Motor -> Motor : xQueueCreate(10, sizeof(motor_cmd_msg_t))
+
+Motor -> Motor : Create motor control task
+Motor -> Motor : xTaskCreate(stepper_motor_task, ...)
+
+alt Motor initialization successful
+    Motor --> Main : ESP_OK
+    Main -> Main : ESP_LOGI("Motor initialized successfully")
+else Motor initialization failed
+    Motor --> Main : ESP_FAIL
+    Main -> Main : ESP_LOGE("Motor initialization failed")
+    Main --> Boot : return [CRITICAL ERROR]
+end
+deactivate Motor
+
+== BLE Initialization ==
+Main -> BLE : init_ble()
+activate BLE
+
+BLE -> BLE : ESP_LOGI("Initializing BLE peripheral")
+BLE -> BLE : ble_peripheral_init()
+
+BLE -> BLE : nimble_port_init()
+BLE -> BLE : Configure BLE host stack
+BLE -> BLE : Set device name
+
+BLE -> GATT : gatt_svr_init()
+activate GATT
+GATT -> GATT : Register LED Control Service
+GATT -> GATT : Register Motor Control Service
+GATT -> GATT : Initialize characteristics
+GATT --> BLE : Services registered
+deactivate GATT
+
+BLE -> BLE : nimble_port_freertos_init()
+BLE -> BLE : Start BLE host task
+
+alt BLE initialization successful
+    BLE --> Main : ESP_OK
+    Main -> Main : ESP_LOGI("BLE initialized successfully")
+    Main -> GATT : gatt_svr_set_motor(&g_motor)
+    activate GATT
+    GATT -> GATT : Store motor reference
+    deactivate GATT
+else BLE initialization failed
+    BLE --> Main : ESP_FAIL
+    Main -> Main : ESP_LOGE("BLE initialization failed")
+    Main --> Boot : return [CRITICAL ERROR]
+end
+deactivate BLE
+
+== System Ready ==
+Main -> Main : system_status = SYSTEM_STATUS_READY
+Main -> Main : ESP_LOGI("System Initialization Complete")
+
+== Optional Test Execution ==
+opt CONFIG_ENABLE_MOTOR_TESTS defined
+    Main -> Test : run_motor_tests()
+    activate Test
+    
+    Test -> Test : ESP_LOGI("Starting Motor Test Suite")
+    Test -> Main : system_status = SYSTEM_STATUS_TESTING
+    
+    par Hardware Test
+        Test -> Motor : motor_test_hardware(&g_motor)
+        activate Motor
+        Motor -> Motor : Check GPIO configuration
+        Motor -> Motor : Test pin responses
+        Motor --> Test : test_result
+        deactivate Motor
+    and Movement Test
+        Test -> Motor : motor_test_movement(&g_motor)
+        activate Motor
+        Motor -> Motor : Execute test movements
+        Motor -> Motor : Validate positions
+        Motor --> Test : test_result
+        deactivate Motor
+    and Accuracy Test
+        Test -> Motor : motor_test_position_accuracy(&g_motor)
+        activate Motor
+        Motor -> Motor : Test multiple positions
+        Motor -> Motor : Measure accuracy
+        Motor --> Test : test_result
+        deactivate Motor
+    and Speed Test
+        Test -> Motor : motor_test_speed_variations(&g_motor)
+        activate Motor
+        Motor -> Motor : Test different speeds
+        Motor -> Motor : Measure timing
+        Motor --> Test : test_result
+        deactivate Motor
+    end
+    
+    Test -> Test : Analyze all results
+    alt All tests passed
+        Test -> Test : ESP_LOGI("All Motor Tests Passed!")
+        Test -> Test : Flash success pattern
+    else Some tests failed
+        Test -> Test : ESP_LOGE("Motor Test Suite Failed")
+        Test -> Test : Flash error pattern
+    end
+    
+    Test -> Main : system_status = SYSTEM_STATUS_READY
+    Test --> Main : final_result
+    deactivate Test
+end
+
+== Task Creation ==
+Main -> Task : xTaskCreate(app_main_task, ...)
+activate Task
+
+Task -> Task : ESP_LOGI("Main application task started")
+Task -> Task : Start monitoring loop
+
+loop Continuous Operation
+    Task -> Task : Monitor system status
+    Task -> Motor : stepper_motor_is_fault(&g_motor)
+    activate Motor
+    Motor -> Motor : Read fault pin
+    Motor --> Task : fault_status
+    deactivate Motor
+    
+    alt Fault detected
+        Task -> Task : ESP_LOGE("Motor fault detected!")
+        Task -> Main : system_status = SYSTEM_STATUS_ERROR
+    end
+    
+    Task -> Task : Log periodic status
+    Task -> Task : vTaskDelay(100ms)
+end
+
+== System Running ==
+Main -> Main : system_status = SYSTEM_STATUS_RUNNING
+Main -> Main : ESP_LOGI("System Running")
+Main -> Main : ESP_LOGI("BLE device name: %s", BLE_DEVICE_NAME)
+Main -> Main : ESP_LOGI("Connect with BLE client")
+Main -> Main : ESP_LOGI("LED indicators ready")
+
+Main --> Boot : System operational
+
+note over Main, Motor : System is now fully operational\nand ready to accept BLE commands
+
+deactivate Task
+deactivate Main
+
+@enduml 

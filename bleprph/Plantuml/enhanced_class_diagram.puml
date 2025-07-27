@@ -1,0 +1,239 @@
+@startuml Enhanced_Class_Structure_Diagram
+!theme plain
+skinparam linetype ortho
+skinparam packageStyle rectangle
+
+title ESP32 Stepper Motor Controller - Enhanced Class/Structure Diagram
+
+' Define packages for different layers
+package "Application Layer" as AppLayer {
+    class MainApplication {
+        - system_status_t system_status
+        - stepper_motor_t g_motor
+        + esp_err_t init_nvs()
+        + esp_err_t init_motor()
+        + esp_err_t init_ble()
+        + void run_motor_tests()
+        + void app_main_task()
+        + void app_main()
+    }
+}
+
+package "Stepper Motor Component" as StepperPkg {
+    ' Main motor structure
+    class stepper_motor_t {
+        ' Hardware Configuration
+        + gpio_num_t ain1_pin
+        + gpio_num_t ain2_pin
+        + gpio_num_t bin1_pin
+        + gpio_num_t bin2_pin
+        + gpio_num_t sleep_pin
+        + gpio_num_t fault_pin
+        ' Runtime State
+        + int16_t current_position
+        + int16_t target_position
+        + uint16_t speed_delay_ms
+        + int16_t max_position
+        + int16_t min_position
+        + uint8_t current_step
+        + bool is_moving
+        + bool direction
+    }
+    
+    ' Command message structure
+    class motor_cmd_msg_t <<Internal>> {
+        + motor_command_t command
+        + int16_t parameter
+    }
+    
+    ' API Interface
+    class StepperMotorAPI <<Interface>> {
+        + {static} esp_err_t stepper_motor_init(stepper_motor_t*)
+        + {static} esp_err_t stepper_motor_move_to_position(stepper_motor_t*, int16_t)
+        + {static} esp_err_t stepper_motor_move_relative(stepper_motor_t*, int16_t)
+        + {static} esp_err_t stepper_motor_home(stepper_motor_t*)
+        + {static} esp_err_t stepper_motor_stop(stepper_motor_t*)
+        + {static} esp_err_t stepper_motor_set_speed(stepper_motor_t*, uint16_t)
+        + {static} esp_err_t stepper_motor_enable(stepper_motor_t*)
+        + {static} esp_err_t stepper_motor_disable(stepper_motor_t*)
+        + {static} motor_status_t stepper_motor_get_status(stepper_motor_t*)
+        + {static} int16_t stepper_motor_get_position(stepper_motor_t*)
+        + {static} bool stepper_motor_is_fault(stepper_motor_t*)
+        + {static} void stepper_motor_task(void*)
+        + {static} void stepper_motor_test_movement(stepper_motor_t*)
+    }
+}
+
+package "BLE Peripheral Component" as BLEPkg {
+    ' BLE Peripheral API
+    class BLEPeripheralAPI <<Interface>> {
+        + {static} esp_err_t ble_peripheral_init()
+        + {static} esp_err_t ble_peripheral_start_advertising()
+        + {static} esp_err_t ble_peripheral_stop_advertising()
+        + {static} bool ble_peripheral_is_connected()
+        + {static} uint16_t ble_peripheral_get_conn_handle()
+    }
+    
+    ' GATT Server API
+    class GATTServerAPI <<Interface>> {
+        + {static} esp_err_t gatt_svr_init()
+        + {static} void gatt_svr_set_motor(void*)
+        + {static} void gatt_svr_register_cb(ble_gatt_register_ctxt*, void*)
+    }
+    
+    ' BLE State Management
+    class BLEState <<Internal>> {
+        - uint16_t conn_handle
+        - bool is_connected
+        - uint8_t ble_addr_type
+        - uint8_t led_states[4]
+        - uint16_t led_handles[4]
+        - uint16_t motor_handles[4]
+        - stepper_motor_t* g_motor
+    }
+}
+
+package "Motor Testing Component" as TestPkg {
+    class MotorTestAPI <<Interface>> {
+        + {static} esp_err_t motor_test_hardware(stepper_motor_t*)
+        + {static} esp_err_t motor_test_movement(stepper_motor_t*)
+        + {static} esp_err_t motor_test_position_accuracy(stepper_motor_t*)
+        + {static} esp_err_t motor_test_speed_variations(stepper_motor_t*)
+        + {static} esp_err_t motor_test_suite(stepper_motor_t*)
+    }
+}
+
+package "Common Types Component" as CommonPkg {
+    ' Hardware Configuration
+    class HardwareConfig <<Configuration>> {
+        + {static} DEFAULT_MOTOR_AIN1 : GPIO_NUM_26
+        + {static} DEFAULT_MOTOR_AIN2 : GPIO_NUM_27
+        + {static} DEFAULT_MOTOR_BIN1 : GPIO_NUM_14
+        + {static} DEFAULT_MOTOR_BIN2 : GPIO_NUM_12
+        + {static} DEFAULT_MOTOR_SLEEP : GPIO_NUM_13
+        + {static} DEFAULT_MOTOR_FAULT : GPIO_NUM_25
+        + {static} DEFAULT_LED1_GPIO : GPIO_NUM_2
+        + {static} DEFAULT_LED2_GPIO : GPIO_NUM_4
+        + {static} DEFAULT_LED3_GPIO : GPIO_NUM_5
+        + {static} DEFAULT_LED4_GPIO : GPIO_NUM_18
+    }
+    
+    ' System Configuration
+    class SystemConfig <<Configuration>> {
+        + {static} DEVICE_NAME : "ESP32_StepperMotor"
+        + {static} FIRMWARE_VERSION : "1.0.0"
+        + {static} BLE_DEVICE_NAME : DEVICE_NAME
+        + {static} BLE_APPEARANCE : 0x0000
+        + {static} BLE_ADV_INTERVAL_MIN : 0x20
+        + {static} BLE_ADV_INTERVAL_MAX : 0x40
+    }
+    
+    ' Motor Configuration
+    class MotorConfig <<Configuration>> {
+        + {static} STEPS_PER_REVOLUTION : 200
+        + {static} MICROSTEPS : 1
+        + {static} THREAD_PITCH_MM : 2.0
+        + {static} STEPS_PER_MM : (calculated)
+        + {static} STROKE_LENGTH_MM : 50
+        + {static} MOTOR_DEFAULT_SPEED : 10
+        + {static} MOTOR_MIN_SPEED : 1
+        + {static} MOTOR_MAX_SPEED : 1000
+    }
+}
+
+package "Enumerations" as EnumPkg {
+    enum motor_command_t {
+        MOTOR_CMD_STOP = 0
+        MOTOR_CMD_MOVE_ABSOLUTE
+        MOTOR_CMD_MOVE_RELATIVE
+        MOTOR_CMD_HOME
+        MOTOR_CMD_SET_SPEED
+        MOTOR_CMD_ENABLE
+        MOTOR_CMD_DISABLE
+    }
+    
+    enum motor_status_t {
+        MOTOR_STATUS_IDLE = 0
+        MOTOR_STATUS_MOVING
+        MOTOR_STATUS_ERROR
+        MOTOR_STATUS_DISABLED
+    }
+    
+    enum system_status_t {
+        SYSTEM_STATUS_INIT = 0
+        SYSTEM_STATUS_READY
+        SYSTEM_STATUS_RUNNING
+        SYSTEM_STATUS_ERROR
+        SYSTEM_STATUS_TESTING
+    }
+    
+    enum system_error_t {
+        ERR_MOTOR_FAULT = 0x1000
+        ERR_BLE_INIT_FAILED
+        ERR_MOTOR_INIT_FAILED
+        ERR_INVALID_COMMAND
+        ERR_HARDWARE_FAULT
+    }
+}
+
+package "ESP-IDF Framework" as FrameworkPkg {
+    class ESPFramework <<Framework>> {
+        + gpio_config_t
+        + TaskHandle_t
+        + QueueHandle_t
+        + esp_err_t
+        + ble_gatt_register_ctxt
+        + ble_gap_event
+        + os_mbuf
+    }
+}
+
+' Relationships - Composition and Usage
+MainApplication *-- stepper_motor_t : contains
+MainApplication --> StepperMotorAPI : uses
+MainApplication --> BLEPeripheralAPI : uses
+MainApplication --> MotorTestAPI : uses
+MainApplication --> system_status_t : uses
+
+' Component Internal Relationships
+StepperMotorAPI --> stepper_motor_t : operates on
+StepperMotorAPI --> motor_command_t : uses
+StepperMotorAPI --> motor_status_t : returns
+motor_cmd_msg_t --> motor_command_t : contains
+
+' BLE Component Relationships
+BLEState --> stepper_motor_t : references
+GATTServerAPI --> stepper_motor_t : controls
+BLEPeripheralAPI --> BLEState : manages
+
+' Configuration Dependencies
+stepper_motor_t --> HardwareConfig : initialized from
+stepper_motor_t --> MotorConfig : configured by
+BLEPeripheralAPI --> SystemConfig : uses
+MainApplication --> SystemConfig : uses
+
+' Testing Relationships
+MotorTestAPI --> stepper_motor_t : tests
+MotorTestAPI --> StepperMotorAPI : invokes
+
+' Framework Dependencies
+StepperMotorAPI --> ESPFramework : depends on
+BLEPeripheralAPI --> ESPFramework : depends on
+MotorTestAPI --> ESPFramework : depends on
+
+' Cross-component usage
+GATTServerAPI ..> motor_command_t : sends
+BLEState ..> motor_status_t : reports
+
+' Notes with detailed explanations
+note right of stepper_motor_t : Core data structure containing:\n• Hardware pin configuration\n• Runtime position tracking\n• Movement control state\n• Thread-safe operation
+note right of motor_cmd_msg_t : Internal queue message for:\n• Thread-safe command passing\n• Asynchronous motor control\n• Parameter transmission
+note bottom of HardwareConfig : Centralized pin definitions:\n• Easy hardware customization\n• Single source of truth\n• Platform abstraction
+note left of BLEState : BLE runtime state:\n• Connection management\n• Handle tracking\n• Motor reference\n• LED state management
+
+' Multiplicity indicators
+MainApplication ||--|| stepper_motor_t : "1"
+BLEState ||--|| stepper_motor_t : "reference"
+motor_cmd_msg_t }o--|| motor_command_t : "contains"
+
+@enduml 

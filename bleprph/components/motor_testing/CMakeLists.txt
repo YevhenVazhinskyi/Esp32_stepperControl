@@ -1,0 +1,10 @@
+idf_component_register(
+    SRCS 
+        "src/motor_test.c"
+    INCLUDE_DIRS 
+        "include"
+    REQUIRES 
+        stepper_motor
+        freertos
+        esp_log
+) 

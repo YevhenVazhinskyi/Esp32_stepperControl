@@ -1,0 +1,242 @@
+@startuml Error_Handling_Activity
+!theme plain
+
+title ESP32 Stepper Motor Controller - Error Handling & Recovery Activity
+
+|System Monitor|
+start
+:System running normally;
+:app_main_task() monitoring;
+
+fork
+    |Fault Detection|
+    repeat
+        :Check motor fault pin;
+        :stepper_motor_is_fault();
+        :Read GPIO_NUM_25;
+        :vTaskDelay(100ms);
+    repeat while (Fault pin HIGH?) is (yes)
+    -> Fault detected (pin LOW);
+    
+fork again
+    |System Status Monitor|
+    repeat
+        :Monitor system status;
+        :Check BLE connection health;
+        :Validate task responses;
+        :vTaskDelay(1000ms);
+    repeat while (All systems OK?) is (yes)
+    -> System anomaly detected;
+    
+fork again
+    |Initialization Errors|
+    :Monitor initialization results;
+    if (NVS init failed?) then (yes)
+        :Critical system error;
+    elseif (Motor init failed?) then (yes)
+        :Motor subsystem error;
+    elseif (BLE init failed?) then (yes)
+        :BLE subsystem error;
+    endif
+end fork
+
+|Error Classification|
+:Determine error type and severity;
+
+switch (Error Type?)
+case (Motor Hardware Fault)
+    |Motor Error Handler|
+    :ESP_LOGE("Motor fault detected!");
+    :system_status = SYSTEM_STATUS_ERROR;
+    :motor->is_moving = false;
+    :motor_stop_pins(motor);
+    :Disable motor driver;
+    :Flash all LEDs as fault indicator;
+    
+    |Motor Recovery|
+    repeat
+        :Wait 5 seconds;
+        :vTaskDelay(pdMS_TO_TICKS(5000));
+        :Re-check fault pin;
+        :stepper_motor_is_fault();
+        
+        if (Fault cleared?) then (yes)
+            :ESP_LOGI("Motor fault cleared");
+            :gpio_set_level(sleep_pin, 1);
+            :Re-enable motor driver;
+            :motor->current_position = 0;
+            :Reset position to safe state;
+            :system_status = SYSTEM_STATUS_READY;
+            :ESP_LOGI("Motor recovery successful");
+            break
+        else (no)
+            :ESP_LOGW("Motor fault persists");
+            :Increment retry counter;
+            if (Max retries reached?) then (yes)
+                :ESP_LOGE("Motor recovery failed");
+                :system_status = SYSTEM_STATUS_ERROR;
+                :Disable motor permanently;
+                stop
+            endif
+        endif
+    repeat while (Fault persists)
+    
+case (BLE Connection Error)
+    |BLE Error Handler|
+    :ESP_LOGE("BLE error detected");
+    :Log connection parameters;
+    :Clean up current connection;
+    
+    if (Critical BLE stack error?) then (yes)
+        :ESP_LOGE("BLE stack failure");
+        :Attempt stack restart;
+        :nimble_port_stop();
+        :vTaskDelay(pdMS_TO_TICKS(1000));
+        :nimble_port_init();
+        :ble_peripheral_init();
+        
+        if (BLE restart successful?) then (yes)
+            :ESP_LOGI("BLE stack recovered");
+            :Resume normal operation;
+        else (no)
+            :ESP_LOGE("BLE recovery failed");
+            :Continue with BLE disabled;
+            :System runs motor-only mode;
+        endif
+    else (no)
+        :Simple connection issue;
+        :Restart advertising;
+        :ble_advertise();
+        :ESP_LOGI("BLE advertising restarted");
+    endif
+    
+case (System Resource Error)
+    |System Error Handler|
+    :ESP_LOGE("System resource error");
+    :Check available heap memory;
+    :esp_get_free_heap_size();
+    :Check task stack usage;
+    :uxTaskGetStackHighWaterMark();
+    
+    if (Memory critically low?) then (yes)
+        :ESP_LOGE("Critical memory shortage");
+        :Free non-essential resources;
+        :Reduce queue sizes;
+        :Disable test functionality;
+        
+        if (Memory recovered?) then (yes)
+            :ESP_LOGI("Memory situation improved");
+            :Continue with reduced functionality;
+        else (no)
+            :ESP_LOGE("Memory recovery failed");
+            :System halt required;
+            :esp_restart();
+            stop
+        endif
+    else (no)
+        :Log resource usage;
+        :Continue monitoring;
+    endif
+    
+case (Task Watchdog Timeout)
+    |Watchdog Handler|
+    :ESP_LOGE("Task watchdog timeout");
+    :Identify blocked task;
+    :Log task states;
+    
+    if (Motor task blocked?) then (yes)
+        :Clear motor command queue;
+        :xQueueReset(motor_command_queue);
+        :Reset motor state;
+        :motor->is_moving = false;
+        :ESP_LOGI("Motor task recovered");
+    elseif (BLE task blocked?) then (yes)
+        :Reset BLE connection;
+        :Restart advertising;
+        :ESP_LOGI("BLE task recovered");
+    elseif (Main task blocked?) then (yes)
+        :ESP_LOGE("Main task blocked - critical");
+        :System restart required;
+        :esp_restart();
+        stop
+    endif
+    
+case (Initialization Failure)
+    |Init Error Handler|
+    :ESP_LOGE("Initialization failed");
+    :system_status = SYSTEM_STATUS_ERROR;
+    
+    if (NVS initialization failed?) then (yes)
+        :ESP_LOGE("NVS flash error");
+        :Attempt flash erase and retry;
+        :ESP_ERROR_CHECK(nvs_flash_erase());
+        :Retry nvs_flash_init();
+        
+        if (NVS retry successful?) then (yes)
+            :Continue initialization;
+        else (no)
+            :Critical system failure;
+            :Cannot continue operation;
+            stop
+        endif
+        
+    elseif (Motor initialization failed?) then (yes)
+        :ESP_LOGE("Motor hardware not available");
+        :system_status = SYSTEM_STATUS_ERROR;
+        :Continue with motor disabled;
+        :BLE-only operation mode;
+        
+    elseif (BLE initialization failed?) then (yes)
+        :ESP_LOGE("BLE stack failure");
+        :Continue without BLE;
+        :Motor-only operation mode;
+        :Enable UART debug interface;
+    endif
+    
+endswitch
+
+|Recovery Validation|
+if (Recovery successful?) then (yes)
+    :Run system health check;
+    
+    fork
+        :Test motor functionality;
+        :stepper_motor_enable();
+        :Move small test distance;
+        :Check position accuracy;
+    fork again
+        :Test BLE functionality;
+        :Verify advertising active;
+        :Check GATT services;
+        :Test characteristic access;
+    end fork
+    
+    if (All tests passed?) then (yes)
+        :ESP_LOGI("System recovery complete");
+        :system_status = SYSTEM_STATUS_READY;
+        :Reset error counters;
+        :Log recovery success;
+    else (no)
+        :ESP_LOGW("Partial recovery only");
+        :Continue with limited functionality;
+        :system_status = SYSTEM_STATUS_RUNNING;
+    endif
+else (no)
+    :ESP_LOGE("Recovery failed");
+    :Log error details for debugging;
+    :Enter safe mode;
+    :Disable all non-essential functions;
+    :system_status = SYSTEM_STATUS_ERROR;
+endif
+
+:Resume normal operation with error monitoring;
+
+note right : Fault Detection:\n• Motor fault pin (GPIO 25)\n• BLE connection health\n• System resource usage\n• Task responsiveness\n• Memory availability
+
+note left : Recovery Strategies:\n• Motor: 5s wait, retry 3x\n• BLE: Stack restart if critical\n• Memory: Free resources\n• Tasks: Reset queues/state\n• System: Restart if critical
+
+note bottom : Error Priorities:\n1. Critical: System halt/restart\n2. High: Component disable\n3. Medium: Retry with backoff\n4. Low: Log and continue\n\nRecovery Time Limits:\n• Motor fault: 15s max\n• BLE recovery: 10s max\n• Memory cleanup: 5s max
+
+stop
+
+@enduml 

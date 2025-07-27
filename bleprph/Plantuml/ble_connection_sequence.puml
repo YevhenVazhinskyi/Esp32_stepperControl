@@ -1,0 +1,223 @@
+@startuml BLE_Connection_Sequence
+!theme plain
+
+title ESP32 Stepper Motor Controller - BLE Connection & Communication Sequence
+
+participant "Mobile\nApp" as Client
+participant "BLE\nController" as BLE_HW
+participant "NimBLE\nStack" as NimBLE
+participant "BLE\nPeripheral" as Peripheral
+participant "GATT\nServer" as GATT
+participant "LED\nService" as LED_Svc
+participant "Motor\nService" as Motor_Svc
+
+== BLE Stack Initialization ==
+activate Peripheral
+Peripheral -> NimBLE : nimble_port_init()
+activate NimBLE
+NimBLE -> NimBLE : Initialize host stack
+NimBLE -> NimBLE : Configure default parameters
+
+Peripheral -> GATT : gatt_svr_init()
+activate GATT
+GATT -> GATT : Register LED Control Service
+note right : UUID: 12345678-90ab-cdef-1234-567890abcdef\n4 LED characteristics (R/W)
+
+GATT -> GATT : Register Motor Control Service  
+note right : UUID: 87654321-abcd-ef90-1234-567890abcdef\nPosition, Command, Status, Speed
+
+GATT --> Peripheral : Services registered
+deactivate GATT
+
+Peripheral -> NimBLE : nimble_port_freertos_init()
+NimBLE -> NimBLE : Start BLE host task on Core 0
+
+== Advertising Phase ==
+Peripheral -> NimBLE : ble_gap_adv_start()
+NimBLE -> BLE_HW : Start advertising
+activate BLE_HW
+
+loop Advertising Loop (every 20-40ms)
+    BLE_HW -> BLE_HW : Broadcast advertisement packet
+    note right : Device name: "ESP32_StepperMotor"\nServices: LED + Motor UUIDs\nConnectable & Discoverable
+end
+
+== Connection Establishment ==
+Client -> BLE_HW : Scan and discover device
+BLE_HW --> Client : Advertisement received
+
+Client -> BLE_HW : Connection request
+BLE_HW -> NimBLE : BLE_GAP_EVENT_CONNECT
+NimBLE -> Peripheral : gap_event_handler()
+
+alt Connection successful
+    Peripheral -> Peripheral : conn_handle = event.conn_handle
+    Peripheral -> Peripheral : is_connected = true
+    Peripheral -> Peripheral : ESP_LOGI("Connection established")
+    NimBLE -> BLE_HW : Stop advertising
+    NimBLE --> Client : Connection confirmed
+else Connection failed
+    Peripheral -> Peripheral : ESP_LOGE("Connection failed")
+    Peripheral -> NimBLE : Restart advertising
+    NimBLE -> BLE_HW : Resume advertising
+end
+
+== Service Discovery ==
+Client -> NimBLE : Discover primary services
+activate Client
+NimBLE -> GATT : Service discovery request
+GATT --> NimBLE : LED Control Service info
+NimBLE --> Client : Service UUID + handle
+
+Client -> NimBLE : Discover characteristics (LED Service)
+NimBLE -> GATT : Characteristic discovery
+GATT --> NimBLE : LED1, LED2, LED3, LED4 characteristics
+NimBLE --> Client : Characteristic handles + properties
+
+Client -> NimBLE : Discover primary services  
+NimBLE -> GATT : Service discovery request
+GATT --> NimBLE : Motor Control Service info
+NimBLE --> Client : Service UUID + handle
+
+Client -> NimBLE : Discover characteristics (Motor Service)
+NimBLE -> GATT : Characteristic discovery
+GATT --> NimBLE : Position, Command, Status, Speed characteristics
+NimBLE --> Client : Characteristic handles + properties
+
+== LED Control Operations ==
+group LED Control Example
+    Client -> NimBLE : Write LED1 characteristic [value: 1]
+    NimBLE -> GATT : Characteristic write request
+    activate GATT
+    
+    GATT -> LED_Svc : Handle LED1 write
+    activate LED_Svc
+    LED_Svc -> LED_Svc : Determine LED index = 0
+    LED_Svc -> LED_Svc : Parse value = 1 (ON)
+    LED_Svc -> LED_Svc : gpio_set_level(GPIO_NUM_2, 1)
+    LED_Svc -> LED_Svc : led_states[0] = 1
+    LED_Svc -> LED_Svc : ESP_LOGI("LED1 set to ON")
+    LED_Svc --> GATT : Operation complete
+    deactivate LED_Svc
+    
+    GATT -> NimBLE : Write response
+    NimBLE --> Client : Success response
+    deactivate GATT
+end
+
+== Motor Control Operations ==
+group Position Read Operation
+    Client -> NimBLE : Read motor position characteristic
+    NimBLE -> GATT : Characteristic read request
+    activate GATT
+    
+    GATT -> Motor_Svc : Handle position read
+    activate Motor_Svc
+    Motor_Svc -> Motor_Svc : flash_led(LED1, 50ms)
+    Motor_Svc -> Motor_Svc : pos = stepper_motor_get_position(&motor)
+    Motor_Svc -> Motor_Svc : Prepare response [pos:2 bytes]
+    Motor_Svc --> GATT : Position data
+    deactivate Motor_Svc
+    
+    GATT -> NimBLE : Read response with data
+    NimBLE --> Client : Current position value
+    deactivate GATT
+end
+
+group Motor Command Operation
+    Client -> NimBLE : Write motor command characteristic [cmd:1][param:2]
+    NimBLE -> GATT : Characteristic write request
+    activate GATT
+    
+    GATT -> Motor_Svc : Handle command write
+    activate Motor_Svc
+    Motor_Svc -> Motor_Svc : flash_led(LED1, 50ms)
+    Motor_Svc -> Motor_Svc : Parse command and parameter
+    Motor_Svc -> Motor_Svc : Create motor_cmd_msg_t
+    
+    alt Command type = MOVE_ABSOLUTE
+        Motor_Svc -> Motor_Svc : flash_led(LED1, 200ms)
+        Motor_Svc -> Motor_Svc : cmd.command = MOTOR_CMD_MOVE_ABSOLUTE
+    else Command type = HOME
+        Motor_Svc -> Motor_Svc : flash_led(LED3, 500ms)
+        Motor_Svc -> Motor_Svc : cmd.command = MOTOR_CMD_HOME
+    else Command type = STOP
+        Motor_Svc -> Motor_Svc : flash_led(LED4, 100ms)
+        Motor_Svc -> Motor_Svc : cmd.command = MOTOR_CMD_STOP
+    end
+    
+    Motor_Svc -> Motor_Svc : xQueueSend(motor_command_queue, &cmd, 100ms)
+    Motor_Svc --> GATT : Command queued
+    deactivate Motor_Svc
+    
+    GATT -> NimBLE : Write response
+    NimBLE --> Client : Success response
+    deactivate GATT
+end
+
+== Notification Subscription ==
+group Subscribe to Position Updates
+    Client -> NimBLE : Enable notifications on position characteristic
+    NimBLE -> GATT : Subscribe request
+    activate GATT
+    
+    GATT -> GATT : BLE_GAP_EVENT_SUBSCRIBE
+    GATT -> GATT : Store subscription state
+    GATT -> GATT : ESP_LOGI("Client subscribed to position notifications")
+    
+    GATT -> NimBLE : Subscription confirmed
+    NimBLE --> Client : Subscription active
+    deactivate GATT
+end
+
+== Real-time Notifications ==
+loop Position Updates (when motor moves)
+    note over Motor_Svc : Motor position changes during movement
+    
+    Motor_Svc -> GATT : Position changed notification
+    activate GATT
+    GATT -> GATT : Prepare position data
+    GATT -> NimBLE : ble_gatts_chr_updated(position_handle)
+    NimBLE -> BLE_HW : Send notification packet
+    BLE_HW --> Client : Position notification [new_position:2]
+    deactivate GATT
+    
+    opt Status updates
+        Motor_Svc -> GATT : Status changed notification
+        activate GATT
+        GATT -> GATT : Prepare status data [status:1][position:2][fault:1]
+        GATT -> NimBLE : ble_gatts_chr_updated(status_handle)
+        NimBLE -> BLE_HW : Send notification packet
+        BLE_HW --> Client : Status notification
+        deactivate GATT
+    end
+end
+
+== Connection Termination ==
+alt Client-initiated disconnection
+    Client -> NimBLE : Disconnect request
+    NimBLE -> BLE_HW : Terminate connection
+else Connection timeout/error  
+    BLE_HW -> NimBLE : BLE_GAP_EVENT_DISCONNECT
+end
+
+NimBLE -> Peripheral : gap_event_handler(DISCONNECT)
+Peripheral -> Peripheral : conn_handle = BLE_HS_CONN_HANDLE_NONE
+Peripheral -> Peripheral : is_connected = false
+Peripheral -> Peripheral : ESP_LOGI("Connection terminated")
+
+== Auto-restart Advertising ==
+Peripheral -> Peripheral : Clean up connection resources
+Peripheral -> Peripheral : Reset subscription states
+Peripheral -> NimBLE : ble_advertise()
+NimBLE -> BLE_HW : Resume advertising
+Peripheral -> Peripheral : ESP_LOGI("Advertising restarted")
+
+deactivate BLE_HW
+deactivate NimBLE
+deactivate Client
+deactivate Peripheral
+
+note over Client, Motor_Svc : System ready for new BLE connection\nMotor operations continue independently
+
+@enduml 

@@ -1,0 +1,107 @@
+@startuml Combined_State_Overview
+!theme plain
+
+title ESP32 Stepper Motor Controller - Combined State Machine Overview
+
+' System-level composite state
+state "System Controller" as SystemLevel {
+    
+    ' System states
+    state "System States" as SysStates {
+        state INIT as "SYSTEM_INIT\n• Initialize NVS\n• Setup components\n• Start tasks"
+        state READY as "SYSTEM_READY\n• Monitor faults\n• Log status\n• Process events"
+        state RUNNING as "SYSTEM_RUNNING\n• Full operation\n• Handle commands\n• Update indicators"
+        state ERROR as "SYSTEM_ERROR\n• Error recovery\n• Fault handling\n• Wait & retry"
+        state TESTING as "SYSTEM_TESTING\n• Run test suite\n• Validate hardware\n• Report results"
+        
+        [*] --> INIT
+        INIT --> READY : All OK
+        INIT --> ERROR : Failed
+        READY --> RUNNING : Task started
+        READY --> ERROR : Fault
+        READY --> TESTING : Tests enabled
+        RUNNING --> ERROR : Critical fault
+        ERROR --> READY : Recovered
+        TESTING --> READY : Complete
+    }
+    
+    ' Motor subsystem states
+    state "Motor Controller" as MotorStates {
+        state M_DISABLED as "DISABLED\n• Sleep mode\n• All pins LOW\n• No operation"
+        state M_IDLE as "IDLE\n• Monitoring\n• Queue ready\n• Power save"
+        state M_MOVING as "MOVING\n• Step generation\n• Position tracking\n• Speed control"
+        state M_ERROR as "FAULT\n• Hardware fault\n• Stop movement\n• Recovery wait"
+        
+        [*] --> M_DISABLED
+        M_DISABLED --> M_IDLE : ENABLE
+        M_IDLE --> M_DISABLED : DISABLE
+        M_IDLE --> M_MOVING : MOVE cmd
+        M_IDLE --> M_ERROR : Fault
+        M_MOVING --> M_IDLE : Complete
+        M_MOVING --> M_ERROR : Fault
+        M_ERROR --> M_IDLE : Cleared
+    }
+    
+    ' BLE subsystem states
+    state "BLE Controller" as BLEStates {
+        state B_INIT as "BLE_INIT\n• Stack setup\n• GATT services\n• Configuration"
+        state B_ADVERTISING as "ADVERTISING\n• Broadcast name\n• Wait connection\n• Auto-restart"
+        state B_CONNECTED as "CONNECTED\n• GATT active\n• Handle requests\n• Send notifications"
+        state B_DISCONNECTED as "DISCONNECTED\n• Cleanup\n• Prepare restart\n• Reset state"
+        
+        [*] --> B_INIT
+        B_INIT --> B_ADVERTISING : Success
+        B_ADVERTISING --> B_CONNECTED : Client connects
+        B_CONNECTED --> B_DISCONNECTED : Disconnect
+        B_DISCONNECTED --> B_ADVERTISING : Auto-restart
+    }
+}
+
+' Inter-system state dependencies and synchronization
+SysStates --> MotorStates : Control Motor
+SysStates --> BLEStates : Control BLE
+MotorStates --> SysStates : Report Status
+BLEStates --> SysStates : Report Events
+BLEStates --> MotorStates : Send Commands
+
+' Cross-system event flows
+INIT --> B_INIT : Initialize BLE
+INIT --> M_DISABLED : Initialize Motor
+READY --> M_IDLE : Enable Motor (if no faults)
+
+B_CONNECTED --> M_MOVING : BLE Motor Commands
+M_ERROR --> ERROR : Critical Motor Fault
+ERROR --> M_DISABLED : System Recovery
+
+' Concurrent operations (parallel states)
+state "Concurrent Operations" as Parallel {
+    state "Task Management" as TaskMgmt {
+        state MAIN_TASK as "Main App Task\n• System monitoring\n• Fault checking\n• Status logging"
+        state MOTOR_TASK as "Motor Task\n• Command processing\n• Step generation\n• Position tracking"
+        state BLE_TASK as "BLE Host Task\n• Stack processing\n• Event handling\n• GATT operations"
+        
+        MAIN_TASK : Running on Core 1
+        MOTOR_TASK : Running on Core 1
+        BLE_TASK : Running on Core 0
+    }
+    
+    --
+    
+    state "Hardware Monitoring" as HWMon {
+        state GPIO_PINS as "GPIO States\n• Motor pins\n• LED indicators\n• Fault detection"
+        state POSITION as "Position Tracking\n• Current steps\n• Target position\n• Limits check"
+        state TIMING as "Timing Control\n• Step delays\n• Task scheduling\n• Timeouts"
+    }
+}
+
+' System synchronization points
+note right of SystemLevel : State Synchronization:\n• System status controls all subsystems\n• Motor faults propagate to system level\n• BLE commands affect motor directly\n• Error recovery coordinates all states
+
+note bottom of Parallel : Concurrent Execution:\n• FreeRTOS task scheduling\n• Queue-based communication\n• Interrupt-driven GPIO\n• Timer-based delays
+
+' Real-time constraints
+note left of MotorStates : Real-time Requirements:\n• Step timing: 1-1000ms\n• Fault response: <100ms\n• Position update: every step\n• Queue processing: 10ms
+
+note right of BLEStates : Event Response Times:\n• Connection: <3s\n• GATT request: <30ms\n• Notification: <100ms\n• Advertising: 20-40ms intervals
+
+@enduml 

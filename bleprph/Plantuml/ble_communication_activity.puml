@@ -1,0 +1,162 @@
+@startuml BLE_Communication_Activity
+!theme plain
+
+title ESP32 Stepper Motor Controller - BLE Communication Activity Flow
+
+|ESP32 BLE Stack|
+start
+:BLE stack initialization complete;
+:ble_peripheral_init() successful;
+
+|Advertising|
+:Start BLE advertising;
+:ble_gap_adv_start();
+:Broadcast device name "ESP32_StepperMotor";
+:Advertise LED and Motor services;
+:Set advertising interval 20-40ms;
+
+repeat
+    :Wait for connection request;
+    :ble_gap_event() callback;
+repeat while (No connection?) is (yes)
+-> Connection request received;
+
+|Connection Handling|
+if (Connection successful?) then (yes)
+    :conn_handle = event.conn_handle;
+    :is_connected = true;
+    :ESP_LOGI("Connection established");
+    :Store connection parameters;
+else (no)
+    :ESP_LOGE("Connection failed");
+    :Restart advertising;
+    detach
+endif
+
+|Client|
+:BLE client connected;
+:Discover services and characteristics;
+
+fork
+    |Service Discovery|
+    :Discover LED Control Service;
+    :UUID: 12345678-90ab-cdef-1234-567890abcdef;
+    :Find 4 LED characteristics;
+fork again
+    :Discover Motor Control Service;
+    :UUID: 87654321-abcd-ef90-1234-567890abcdef;
+    :Find Position, Command, Status, Speed characteristics;
+end fork
+
+|GATT Operations|
+repeat
+    |Client Request|
+    :Client sends GATT request;
+    
+    switch (Request Type?)
+    case (LED Characteristic Write)
+        |LED Service Handler|
+        :Receive LED write request;
+        :Determine LED index (1-4);
+        :Parse new LED state (0/1);
+        :gpio_set_level(led_pin, state);
+        :Update led_states[index];
+        :ESP_LOGI("LED%d set to %d", index, state);
+        :Return success response;
+        
+    case (LED Characteristic Read)
+        :Return current LED state;
+        :Read led_states[index];
+        :Send current value to client;
+        
+    case (Motor Position Write)
+        |Motor Service Handler|
+        :Flash LED1 (50ms) for activity;
+        :Parse target position (int16_t);
+        :Clamp to motor limits;
+        :Call stepper_motor_move_to_position();
+        :Flash LED1 (200ms) for position command;
+        :Return success response;
+        
+    case (Motor Position Read)
+        :Flash LED1 (50ms) for activity;
+        :int16_t pos = stepper_motor_get_position();
+        :Return current position to client;
+        
+    case (Motor Command Write)
+        :Flash LED1 (50ms) for activity;
+        :Parse command data [cmd:1][param:2];
+        :Create motor_cmd_msg_t;
+        :xQueueSend(motor_command_queue, &cmd);
+        :Indicate command with appropriate LED;
+        :Return success response;
+        
+    case (Motor Status Read)
+        :Flash LED1 (50ms) for activity;
+        :Collect status data [4 bytes];
+        :status_data[0] = motor_status;
+        :status_data[1-2] = current_position;
+        :status_data[3] = fault_status;
+        :Return status data to client;
+        
+    case (Motor Speed Write)
+        :Flash LED1 (50ms) for activity;
+        :Parse new speed (uint16_t);
+        :Validate speed limits (1-1000ms);
+        :Double flash LED1 for speed change;
+        :Call stepper_motor_set_speed();
+        :Return success response;
+        
+    case (Motor Speed Read)
+        :Flash LED1 (50ms) for activity;
+        :Return motor->speed_delay_ms;
+        
+    case (Notification Subscription)
+        :Client subscribes to notifications;
+        :Enable position/status updates;
+        :Store subscription state;
+        :ESP_LOGI("Client subscribed to notifications");
+        
+    endswitch
+    
+    |Notification Updates|
+    if (Client subscribed AND data changed?) then (yes)
+        fork
+            :Position changed?;
+            if (Position updated?) then (yes)
+                :ble_gatts_chr_updated(position_handle);
+                :Send position notification;
+            endif
+        fork again
+            :Status changed?;
+            if (Motor status updated?) then (yes)
+                :Prepare status data;
+                :Send status notification;
+            endif
+        end fork
+    endif
+    
+repeat while (Client connected?) is (yes)
+-> Client disconnected;
+
+|Disconnection Handling|
+:BLE_GAP_EVENT_DISCONNECT received;
+:conn_handle = BLE_HS_CONN_HANDLE_NONE;
+:is_connected = false;
+:ESP_LOGI("Connection terminated");
+:Clean up connection resources;
+:Reset subscription states;
+
+:Restart advertising automatically;
+:ble_advertise();
+:ESP_LOGI("Advertising restarted");
+
+note right : BLE Services:\n• LED Control Service\n  - 4 characteristics (R/W)\n• Motor Control Service\n  - Position (R/W/N)\n  - Command (W)\n  - Status (R/N)\n  - Speed (R/W)
+
+note left : GATT Response Times:\n• Characteristic read: <10ms\n• Characteristic write: <30ms\n• Notification send: <50ms\n• Connection setup: <3s
+
+note bottom : Visual Feedback:\n• LED1: Motor BLE activity (50ms flash)\n• LED1: Position commands (200ms flash)\n• LED1: Speed commands (double flash)\n• LED2: Motor enable status (solid)\n• LED3: Home command (500ms flash)\n• LED4: Stop command (100ms flash)
+
+detach
+
+@enduml 

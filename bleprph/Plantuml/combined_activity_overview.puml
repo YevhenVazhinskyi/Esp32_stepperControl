@@ -1,0 +1,169 @@
+@startuml Combined_Activity_Overview
+!theme plain
+
+title ESP32 Stepper Motor Controller - Combined Activity Overview
+
+|System Lifecycle|
+start
+:Power On / Reset;
+
+fork
+    |Initialization Flow|
+    :System startup sequence;
+    :NVS → Motor → BLE → Tasks;
+    if (All components OK?) then (yes)
+        :System ready;
+    else (no)
+        :Error handling;
+        :Recovery procedures;
+    endif
+    
+fork again
+    |Test Flow (Optional)|
+    if (CONFIG_ENABLE_MOTOR_TESTS?) then (yes)
+        :Run test suite;
+        :Hardware, Movement, Accuracy, Speed;
+        :Parallel test execution;
+        :Results validation;
+    endif
+    
+end fork
+
+|Runtime Operations|
+fork
+    |Main System Loop|
+    repeat
+        :Monitor system status;
+        :Check for faults;
+        :Log periodic status;
+        :Handle system events;
+        :vTaskDelay(100ms);
+    repeat while (System running?) is (yes)
+    
+fork again
+    |BLE Communication Flow|
+    :Start advertising;
+    repeat
+        :Wait for connection;
+        if (Client connects?) then (yes)
+            repeat
+                :Process GATT requests;
+                switch (Request type?)
+                case (LED control)
+                    :Handle LED operations;
+                case (Motor commands)
+                    :Queue motor commands;
+                case (Status requests)
+                    :Return system status;
+                case (Notifications)
+                    :Send real-time updates;
+                endswitch
+            repeat while (Client connected?) is (yes)
+        endif
+        :Restart advertising;
+    repeat while (BLE enabled?) is (yes)
+    
+fork again
+    |Motor Control Flow|
+    repeat
+        :Check command queue;
+        if (Command received?) then (yes)
+            switch (Command type?)
+            case (Movement)
+                :Calculate target position;
+                :Execute step sequence;
+                repeat
+                    :Generate step;
+                    :Update position;
+                    :Check fault status;
+                    :Apply speed delay;
+                repeat while (Target not reached?) is (yes)
+            case (Configuration)
+                :Update motor settings;
+            case (Enable/Disable)
+                :Control motor driver;
+            endswitch
+        endif
+        :Check for faults;
+        :Update status;
+        :vTaskDelay(10ms);
+    repeat while (Motor enabled?) is (yes)
+    
+end fork
+
+|Error Scenarios|
+if (Critical error detected?) then (yes)
+    |Error Handling Flow|
+    :Classify error type;
+    :Stop affected operations;
+    :Attempt recovery;
+    switch (Error severity?)
+    case (Motor fault)
+        :Hardware fault recovery;
+        :5-second retry cycle;
+        :Maximum 3 attempts;
+    case (BLE error)
+        :Connection recovery;
+        :Stack restart if needed;
+    case (System error)
+        :Resource cleanup;
+        :Possible system restart;
+    case (Memory error)
+        :Free resources;
+        :Reduce functionality;
+    endswitch
+    
+    if (Recovery successful?) then (yes)
+        :Resume normal operation;
+    else (no)
+        :Enter safe mode;
+        :Limited functionality;
+    endif
+endif
+
+|Communication Patterns|
+note right : Inter-Task Communication:\n• Motor commands via FreeRTOS queues\n• BLE events via callbacks\n• Status sharing via global variables\n• Error signaling via status flags
+
+|Timing Constraints|
+note left : Real-Time Requirements:\n• Motor steps: 1-1000ms configurable\n• BLE responses: <30ms\n• Fault detection: <100ms\n• Queue processing: 10ms polling\n• Status updates: 100ms intervals
+
+|Data Flow Directions|
+:BLE Client Commands| -> |GATT Server| : Characteristic writes
+|GATT Server| -> |Motor Queue| : Command messages
+|Motor Task| -> |Hardware| : GPIO pin control
+|Hardware| -> |Motor Task| : Fault pin reading
+|Motor Task| -> |BLE Notifications| : Position updates
+|System Monitor| -> |All Components| : Status queries
+|Error Handlers| -> |All Components| : Recovery actions
+
+|Concurrent Execution|
+partition "Parallel Activities" {
+    :Main monitoring task (100ms cycle);
+    :Motor control task (10ms cycle);
+    :BLE host task (event-driven);
+    :System status logging (10s cycle);
+    :Fault detection (continuous);
+    :LED indicators (real-time);
+}
+
+|System States Integration|
+switch (Current system state?)
+case (SYSTEM_INIT)
+    :Execute initialization flow;
+case (SYSTEM_READY)
+    :Enable monitoring activities;
+case (SYSTEM_RUNNING)
+    :Full operational mode;
+case (SYSTEM_TESTING)
+    :Test suite execution;
+case (SYSTEM_ERROR)
+    :Error recovery activities;
+endswitch
+
+note bottom : System Design Principles:\n• Modular component architecture\n• Thread-safe inter-task communication\n• Graceful error handling and recovery\n• Real-time responsiveness\n• Hardware abstraction\n• Comprehensive testing and validation
+
+:System operational and responsive;
+
+stop
+
+@enduml 

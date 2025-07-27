@@ -1,0 +1,197 @@
+@startuml ESP32_Stepper_Motor_Architecture
+!define RECTANGLE class
+
+title ESP32 Stepper Motor BLE Controller - Component Architecture
+
+' Define colors for different layers
+!define APP_COLOR #E1F5FE
+!define COMPONENT_COLOR #F3E5F5
+!define BLE_COLOR #E8F5E8
+!define TEST_COLOR #FFF3E0
+!define COMMON_COLOR #FCE4EC
+!define HARDWARE_COLOR #F5F5F5
+
+' Main Application Layer
+package "Application Layer" APP_COLOR {
+    [main.c] as Main
+    note right of Main : Application Entry Point\nSystem Coordination\nInitialization Sequence
+}
+
+' Component Layer
+package "Component Layer" {
+    
+    ' Stepper Motor Component
+    package "stepper_motor" COMPONENT_COLOR {
+        [stepper_motor.h] as StepperH
+        [stepper_motor.c] as StepperC
+        [CMakeLists.txt] as StepperCMake
+        [README.md] as StepperDoc
+        
+        StepperH : + stepper_motor_init()
+        StepperH : + stepper_motor_move_to_position()
+        StepperH : + stepper_motor_move_relative()
+        StepperH : + stepper_motor_home()
+        StepperH : + stepper_motor_stop()
+        StepperH : + stepper_motor_get_status()
+        StepperH : + stepper_motor_is_fault()
+        
+        StepperC : - Motor control task
+        StepperC : - Command queue system
+        StepperC : - Position tracking
+        StepperC : - Fault detection
+        StepperC : - Step sequence control
+    }
+    
+    ' BLE Peripheral Component  
+    package "ble_peripheral" BLE_COLOR {
+        [ble_peripheral.h] as BLEH
+        [ble_peripheral.c] as BLEC
+        [gatt_svr.h] as GATTH
+        [gatt_svr.c] as GATTC
+        [CMakeLists.txt] as BLECMake
+        [README.md] as BLEDoc
+        
+        BLEH : + ble_peripheral_init()
+        BLEH : + ble_peripheral_start_advertising()
+        BLEH : + ble_peripheral_is_connected()
+        
+        GATTH : + gatt_svr_init()
+        GATTH : + gatt_svr_set_motor()
+        
+        BLEC : - BLE stack management
+        BLEC : - Advertising control
+        BLEC : - Connection handling
+        
+        GATTC : - LED Control Service
+        GATTC : - Motor Control Service
+        GATTC : - Characteristic handlers
+    }
+    
+    ' Motor Testing Component
+    package "motor_testing" TEST_COLOR {
+        [motor_test.h] as TestH
+        [motor_test.c] as TestC
+        [CMakeLists.txt] as TestCMake
+        [README.md] as TestDoc
+        
+        TestH : + motor_test_hardware()
+        TestH : + motor_test_movement()
+        TestH : + motor_test_position_accuracy()
+        TestH : + motor_test_speed_variations()
+        TestH : + motor_test_suite()
+        
+        TestC : - Hardware validation
+        TestC : - Position accuracy tests
+        TestC : - Speed variation tests
+        TestC : - Comprehensive test suite
+    }
+    
+    ' Common Component
+    package "common" COMMON_COLOR {
+        [common_types.h] as CommonH
+        [CMakeLists.txt] as CommonCMake
+        [README.md] as CommonDoc
+        
+        CommonH : + Hardware pin definitions
+        CommonH : + System constants
+        CommonH : + BLE configuration
+        CommonH : + Motor parameters
+        CommonH : + Common data types
+        CommonH : + Error codes
+    }
+}
+
+' Hardware Abstraction Layer
+package "Hardware Layer" HARDWARE_COLOR {
+    [ESP32 GPIO] as GPIO
+    [DRV8833 Driver] as Driver
+    [Stepper Motor] as Motor
+    [Status LEDs] as LEDs
+    [BLE Radio] as Radio
+    
+    GPIO : GPIO pins for motor control
+    GPIO : GPIO pins for LED control
+    GPIO : Fault detection pin
+    
+    Driver : AIN1, AIN2, BIN1, BIN2
+    Driver : SLEEP, FAULT pins
+    Driver : Motor phase control
+    
+    Motor : 2-phase stepper motor
+    Motor : Position feedback
+    Motor : Step-by-step movement
+    
+    LEDs : Visual status indicators
+    LEDs : Command feedback
+    LEDs : System status
+    
+    Radio : Bluetooth Low Energy
+    Radio : GATT services
+    Radio : Wireless communication
+}
+
+' External Interfaces
+package "External Interfaces" {
+    [Mobile App] as MobileApp
+    [BLE Scanner] as Scanner
+    [Debug Console] as Console
+    
+    MobileApp : Motor control interface
+    MobileApp : Real-time monitoring
+    MobileApp : Status notifications
+    
+    Scanner : Service discovery
+    Scanner : Characteristic testing
+    Scanner : Connection debugging
+    
+    Console : ESP_LOG output
+    Console : Debug information
+    Console : System monitoring
+}
+
+' Dependencies - Main to Components
+Main --> StepperH : uses
+Main --> BLEH : uses
+Main --> GATTH : uses
+Main --> TestH : uses
+Main --> CommonH : includes
+
+' Dependencies - Component Internal
+StepperC --> StepperH : implements
+BLEC --> BLEH : implements
+GATTC --> GATTH : implements
+TestC --> TestH : implements
+
+' Dependencies - Cross-Component
+GATTH --> StepperH : motor reference
+TestH --> StepperH : motor testing
+StepperH --> CommonH : pin definitions
+BLEH --> CommonH : BLE config
+TestH --> CommonH : shared types
+
+' Dependencies - Hardware
+StepperC --> GPIO : controls
+GATTC --> GPIO : LED control
+GPIO --> Driver : signals
+GPIO --> LEDs : controls
+BLEC --> Radio : manages
+Driver --> Motor : drives
+
+' Dependencies - External
+Radio --> MobileApp : connects
+Radio --> Scanner : connects
+Main --> Console : logs
+
+' Build Dependencies
+StepperCMake : requires driver, freertos, esp_log
+BLECMake : requires bt, nimble, stepper_motor, common
+TestCMake : requires stepper_motor, freertos, esp_log
+CommonCMake : requires driver
+
+' Documentation
+note right of StepperDoc : Complete API documentation\nUsage examples\nHardware configuration
+note right of BLEDoc : Service specifications\nCharacteristic definitions\nClient integration guide
+note right of TestDoc : Test procedures\nValidation criteria\nBenchmarking results
+note right of CommonDoc : Configuration guide\nPin mapping\nCustomization instructions
+
+@enduml 

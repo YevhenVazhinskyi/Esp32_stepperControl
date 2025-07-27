@@ -1,0 +1,263 @@
+@startuml Test_Execution_Activity
+!theme plain
+
+title ESP32 Stepper Motor Controller - Test Suite Execution Activity
+
+|Test Controller|
+start
+:CONFIG_ENABLE_MOTOR_TESTS is defined;
+:System initialization complete;
+:Call run_motor_tests();
+
+|Test Suite Manager|
+:ESP_LOGI("=== Starting Motor Test Suite ===");
+:system_status = SYSTEM_STATUS_TESTING;
+:Initialize test counters;
+:Set test timeout limits;
+
+fork
+    |Hardware Test|
+    :ESP_LOGI("Running hardware tests...");
+    :Call motor_test_hardware(&g_motor);
+    
+    partition "Hardware Validation" {
+        :Check motor GPIO pin configuration;
+        :Verify AIN1, AIN2, BIN1, BIN2 pins;
+        :Test SLEEP pin control;
+        :Validate FAULT pin reading;
+        :stepper_motor_enable(&g_motor);
+        :Check motor driver response;
+        :gpio_set_level(sleep_pin, 1);
+        :Wait 100ms for driver ready;
+        :Test basic pin toggling;
+        :set_motor_step(&g_motor, 0);
+        :Verify GPIO output levels;
+        :stepper_motor_disable(&g_motor);
+    }
+    
+    if (Hardware test passed?) then (yes)
+        :ESP_LOGI("Hardware test: PASSED");
+        :hardware_test_result = ESP_OK;
+    else (no)
+        :ESP_LOGE("Hardware test: FAILED");
+        :hardware_test_result = ESP_FAIL;
+    endif
+    
+fork again
+    |Movement Test|
+    :ESP_LOGI("Running movement tests...");
+    :Call motor_test_movement(&g_motor);
+    
+    partition "Basic Movement" {
+        :stepper_motor_enable(&g_motor);
+        :Set speed to 100ms per step;
+        :stepper_motor_set_speed(&g_motor, 100);
+        
+        :Move forward 10 steps;
+        :stepper_motor_move_relative(&g_motor, 10);
+        :Wait for movement completion;
+        repeat
+            :Check if motor still moving;
+            :vTaskDelay(50ms);
+        repeat while (stepper_motor_is_moving()) is (yes)
+        
+        :Verify position = 10;
+        :current_pos = stepper_motor_get_position(&g_motor);
+        if (current_pos == 10?) then (yes)
+            :Forward movement OK;
+        else (no)
+            :Forward movement FAILED;
+        endif
+        
+        :Move backward 5 steps;
+        :stepper_motor_move_relative(&g_motor, -5);
+        :Wait for completion;
+        repeat
+            :vTaskDelay(50ms);
+        repeat while (stepper_motor_is_moving()) is (yes)
+        
+        :Verify position = 5;
+        :current_pos = stepper_motor_get_position(&g_motor);
+        if (current_pos == 5?) then (yes)
+            :Backward movement OK;
+        else (no)
+            :Backward movement FAILED;
+        endif
+        
+        :Return to home position;
+        :stepper_motor_home(&g_motor);
+        :Wait for homing completion;
+        repeat
+            :vTaskDelay(50ms);
+        repeat while (stepper_motor_is_moving()) is (yes)
+        
+        :Verify position = 0;
+        :current_pos = stepper_motor_get_position(&g_motor);
+    }
+    
+    if (All movements correct?) then (yes)
+        :ESP_LOGI("Movement test: PASSED");
+        :movement_test_result = ESP_OK;
+    else (no)
+        :ESP_LOGE("Movement test: FAILED");
+        :movement_test_result = ESP_FAIL;
+    endif
+    
+fork again
+    |Position Accuracy Test|
+    :ESP_LOGI("Running position accuracy tests...");
+    :Call motor_test_position_accuracy(&g_motor);
+    
+    partition "Accuracy Testing" {
+        :Test positions: [0, 25, 50, 100, -25, -50];
+        :accuracy_errors = 0;
+        
+        repeat
+            :Pick next test position from array;
+            :ESP_LOGI("Testing position: %d", target_pos);
+            :stepper_motor_move_to_position(&g_motor, target_pos);
+            
+            :Wait for movement completion;
+            repeat
+                :vTaskDelay(50ms);
+            repeat while (stepper_motor_is_moving()) is (yes)
+            
+            :Check final position;
+            :actual_pos = stepper_motor_get_position(&g_motor);
+            :position_error = abs(actual_pos - target_pos);
+            
+            if (position_error <= 1?) then (yes)
+                :ESP_LOGI("Position %d: PASSED (error: %d)", target_pos, position_error);
+            else (no)
+                :ESP_LOGE("Position %d: FAILED (error: %d)", target_pos, position_error);
+                :accuracy_errors++;
+            endif
+            
+        repeat while (More test positions?) is (yes)
+        
+        :Return to home for cleanup;
+        :stepper_motor_home(&g_motor);
+    }
+    
+    if (accuracy_errors == 0?) then (yes)
+        :ESP_LOGI("Position accuracy test: PASSED");
+        :accuracy_test_result = ESP_OK;
+    else (no)
+        :ESP_LOGE("Position accuracy test: FAILED (%d errors)", accuracy_errors);
+        :accuracy_test_result = ESP_FAIL;
+    endif
+    
+fork again
+    |Speed Variation Test|
+    :ESP_LOGI("Running speed variation tests...");
+    :Call motor_test_speed_variations(&g_motor);
+    
+    partition "Speed Testing" {
+        :Test speeds: [1ms, 10ms, 50ms, 100ms, 500ms, 1000ms];
+        :speed_test_errors = 0;
+        
+        repeat
+            :Pick next test speed from array;
+            :ESP_LOGI("Testing speed: %d ms", test_speed);
+            :stepper_motor_set_speed(&g_motor, test_speed);
+            
+            :Record start time;
+            :start_time = xTaskGetTickCount();
+            :Move 20 steps at test speed;
+            :stepper_motor_move_relative(&g_motor, 20);
+            
+            :Wait for completion;
+            repeat
+                :vTaskDelay(10ms);
+            repeat while (stepper_motor_is_moving()) is (yes)
+            
+            :Record end time;
+            :end_time = xTaskGetTickCount();
+            :actual_duration = (end_time - start_time) * portTICK_PERIOD_MS;
+            :expected_duration = 20 * test_speed;
+            :timing_error = abs(actual_duration - expected_duration);
+            
+            if (timing_error <= (expected_duration * 0.1)) then (yes)
+                :ESP_LOGI("Speed %dms: PASSED (error: %dms)", test_speed, timing_error);
+            else (no)
+                :ESP_LOGE("Speed %dms: FAILED (error: %dms)", test_speed, timing_error);
+                :speed_test_errors++;
+            endif
+            
+            :Return to start position;
+            :stepper_motor_move_relative(&g_motor, -20);
+            :Wait for return movement;
+            repeat
+                :vTaskDelay(10ms);
+            repeat while (stepper_motor_is_moving()) is (yes)
+            
+        repeat while (More test speeds?) is (yes)
+    }
+    
+    if (speed_test_errors == 0?) then (yes)
+        :ESP_LOGI("Speed variation test: PASSED");
+        :speed_test_result = ESP_OK;
+    else (no)
+        :ESP_LOGE("Speed variation test: FAILED (%d errors)", speed_test_errors);
+        :speed_test_result = ESP_FAIL;
+    endif
+    
+end fork
+
+|Results Analysis|
+:Collect all test results;
+:total_tests = 4;
+:passed_tests = 0;
+
+:Count passed tests;
+if (hardware_test_result == ESP_OK?) then (yes)
+    :passed_tests++;
+endif
+if (movement_test_result == ESP_OK?) then (yes)
+    :passed_tests++;
+endif
+if (accuracy_test_result == ESP_OK?) then (yes)
+    :passed_tests++;
+endif
+if (speed_test_result == ESP_OK?) then (yes)
+    :passed_tests++;
+endif
+
+:ESP_LOGI("Test Results: %d/%d passed", passed_tests, total_tests);
+
+if (passed_tests == total_tests?) then (yes)
+    :ESP_LOGI("=== All Motor Tests Passed! ===");
+    :final_result = ESP_OK;
+    :Set success indicator LEDs;
+    :Flash all LEDs 3 times (success pattern);
+else (no)
+    :ESP_LOGE("=== Motor Test Suite Failed ===");
+    :ESP_LOGE("Failed tests: %d", total_tests - passed_tests);
+    :final_result = ESP_FAIL;
+    :Set failure indicator LEDs;
+    :Flash LEDs in error pattern;
+endif
+
+|Cleanup|
+:Ensure motor is in safe state;
+:stepper_motor_home(&g_motor);
+:Wait for homing;
+repeat
+    :vTaskDelay(50ms);
+repeat while (stepper_motor_is_moving()) is (yes)
+
+:stepper_motor_disable(&g_motor);
+:system_status = SYSTEM_STATUS_READY;
+:ESP_LOGI("Test suite cleanup complete");
+
+:Return final_result to main();
+
+note right : Test Execution Order:\n1. Hardware validation first\n2. Basic movement tests\n3. Position accuracy tests\n4. Speed variation tests\n\nAll tests run in parallel\nfor efficiency
+
+note left : Test Validation Criteria:\n• Hardware: GPIO response\n• Movement: Position accuracy ±1 step\n• Accuracy: Target vs actual ±1 step\n• Speed: Timing accuracy ±10%
+
+note bottom : Safety Features:\n• Motor disabled after tests\n• Return to home position\n• Timeout protection (5s per test)\n• Fault detection during tests\n• LED visual feedback\n• Detailed logging
+
+stop
+
+@enduml 

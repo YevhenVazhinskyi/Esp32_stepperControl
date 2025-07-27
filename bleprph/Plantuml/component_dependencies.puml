@@ -1,0 +1,81 @@
+@startuml Component_Dependencies
+!theme plain
+
+title ESP32 Stepper Motor Controller - Component Dependencies
+
+' Application Layer
+package "Application" as App {
+    component [main.c] as Main
+}
+
+' Component Layer
+package "Components" as Components {
+    component [stepper_motor] as StepperMotor <<Component>>
+    component [ble_peripheral] as BLEPeripheral <<Component>>  
+    component [motor_testing] as MotorTesting <<Component>>
+    component [common] as Common <<Component>>
+}
+
+' ESP-IDF Framework
+package "ESP-IDF Framework" as Framework {
+    component [driver] as Driver
+    component [freertos] as FreeRTOS
+    component [esp_log] as ESPLog
+    component [nvs_flash] as NVSFlash
+    component [bt/nimble] as Bluetooth
+}
+
+' Hardware
+package "Hardware" as Hardware {
+    component [ESP32] as MCU
+    component [DRV8833] as MotorDriver
+    component [Stepper Motor] as Motor
+    component [LEDs] as StatusLEDs
+}
+
+' Dependencies - Application to Components
+Main --> StepperMotor : "controls"
+Main --> BLEPeripheral : "initializes"
+Main --> MotorTesting : "runs tests"
+Main --> Common : "uses config"
+
+' Dependencies - Inter-Component  
+BLEPeripheral --> StepperMotor : "motor reference"
+MotorTesting --> StepperMotor : "tests motor"
+BLEPeripheral --> Common : "shared config" 
+StepperMotor --> Common : "pin definitions"
+MotorTesting --> Common : "shared types"
+
+' Dependencies - Components to Framework
+StepperMotor --> Driver : "GPIO control"
+StepperMotor --> FreeRTOS : "tasks & queues"
+StepperMotor --> ESPLog : "logging"
+
+BLEPeripheral --> Bluetooth : "BLE stack"
+BLEPeripheral --> Driver : "LED control"
+BLEPeripheral --> FreeRTOS : "tasks"
+BLEPeripheral --> ESPLog : "logging"
+
+MotorTesting --> FreeRTOS : "delays"
+MotorTesting --> ESPLog : "test results"
+
+Main --> NVSFlash : "initialization"
+Main --> ESPLog : "system logs"
+
+' Dependencies - Framework to Hardware
+Driver --> MCU : "GPIO pins"
+Bluetooth --> MCU : "BLE radio"
+MCU --> MotorDriver : "control signals"
+MCU --> StatusLEDs : "visual feedback"
+MotorDriver --> Motor : "phase control"
+
+' Component Properties
+note right of StepperMotor : Thread-safe motor control\nPosition tracking\nFault detection
+note right of BLEPeripheral : BLE advertising\nGATT services\nLED & motor control
+note right of MotorTesting : Hardware validation\nPosition accuracy\nSpeed testing  
+note right of Common : Pin definitions\nSystem constants\nShared types
+
+' Dependency Types
+note top of Components : All components follow\nESP-IDF structure:\n- include/ headers\n- src/ implementation\n- CMakeLists.txt\n- README.md
+
+@enduml 

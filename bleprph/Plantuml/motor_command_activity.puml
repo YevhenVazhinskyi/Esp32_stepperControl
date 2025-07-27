@@ -1,0 +1,176 @@
+@startuml Motor_Command_Activity
+!theme plain
+
+title ESP32 Stepper Motor Controller - Motor Command Processing Activity
+
+|BLE Client|
+start
+:User initiates motor command;
+:Write to motor characteristic;
+:Send BLE GATT request;
+
+|GATT Server|
+:Receive characteristic write;
+:Parse command data [cmd:1][param:2];
+:Flash LED indicator for command type;
+
+switch (Command Type?)
+case (MOTOR_CMD_MOVE_ABSOLUTE)
+    :flash_led(LED1, 200ms);
+    :Create command message;
+    :cmd.command = MOTOR_CMD_MOVE_ABSOLUTE;
+    :cmd.parameter = target_position;
+case (MOTOR_CMD_MOVE_RELATIVE)
+    :flash_led(LED2, 200ms);
+    :Create command message;
+    :cmd.command = MOTOR_CMD_MOVE_RELATIVE;
+    :cmd.parameter = steps;
+case (MOTOR_CMD_HOME)
+    :flash_led(LED3, 500ms);
+    :Create command message;
+    :cmd.command = MOTOR_CMD_HOME;
+    :cmd.parameter = 0;
+case (MOTOR_CMD_STOP)
+    :flash_led(LED4, 100ms);
+    :Create command message;
+    :cmd.command = MOTOR_CMD_STOP;
+    :cmd.parameter = 0;
+case (MOTOR_CMD_SET_SPEED)
+    :Double flash LED1 (100ms x2);
+    :Create command message;
+    :cmd.command = MOTOR_CMD_SET_SPEED;
+    :cmd.parameter = speed_delay_ms;
+case (MOTOR_CMD_ENABLE)
+    :Set LED2 solid ON;
+    :Create command message;
+    :cmd.command = MOTOR_CMD_ENABLE;
+case (MOTOR_CMD_DISABLE)
+    :Set LED2 OFF;
+    :Create command message;
+    :cmd.command = MOTOR_CMD_DISABLE;
+endswitch
+
+:Send to motor command queue;
+:xQueueSend(motor_command_queue, &cmd, 100ms);
+
+if (Queue send successful?) then (yes)
+    :Return BLE success response;
+else (no)
+    :ESP_LOGE("Failed to send command");
+    :Return BLE error response;
+    stop
+endif
+
+|Motor Task|
+:Wait for command in queue;
+:xQueueReceive(motor_command_queue, &cmd, 10ms);
+
+if (Command received?) then (yes)
+    :Process command;
+else (no)
+    :Continue monitoring;
+    :Check for faults;
+    :Execute movement if active;
+    :Apply power saving;
+    detach
+endif
+
+switch (Received Command?)
+case (MOTOR_CMD_STOP)
+    :motor->is_moving = false;
+    :motor_stop_pins(motor);
+    :ESP_LOGI("Motor stopped");
+case (MOTOR_CMD_MOVE_ABSOLUTE)
+    :motor->target_position = parameter;
+    :Clamp to position limits;
+    :motor->is_moving = true;
+    :ESP_LOGI("Moving to position: %d", parameter);
+case (MOTOR_CMD_MOVE_RELATIVE)
+    :motor->target_position = current_position + parameter;
+    :Clamp to position limits;
+    :motor->is_moving = true;
+    :ESP_LOGI("Moving relative: %d steps", parameter);
+case (MOTOR_CMD_HOME)
+    :motor->target_position = 0;
+    :motor->is_moving = true;
+    :ESP_LOGI("Homing motor");
+case (MOTOR_CMD_SET_SPEED)
+    :motor->speed_delay_ms = parameter;
+    :Validate speed limits;
+    :ESP_LOGI("Speed set to: %d ms", parameter);
+case (MOTOR_CMD_ENABLE)
+    :gpio_set_level(sleep_pin, 1);
+    :ESP_LOGI("Motor enabled");
+case (MOTOR_CMD_DISABLE)
+    :gpio_set_level(sleep_pin, 0);
+    :motor_stop_pins(motor);
+    :motor->is_moving = false;
+    :ESP_LOGI("Motor disabled");
+endswitch
+
+|Movement Execution|
+if (motor->is_moving == true?) then (yes)
+    repeat
+        :Check for fault condition;
+        if (stepper_motor_is_fault()?) then (yes)
+            :ESP_LOGE("Motor fault detected!");
+            :motor->is_moving = false;
+            :motor_stop_pins(motor);
+            :Wait 1 second;
+            stop
+        endif
+        
+        if (current_position != target_position?) then (yes)
+            if (current_position < target_position?) then (yes)
+                :motor->direction = true (forward);
+                :motor->current_step = (current_step + 1) % 4;
+                :motor->current_position++;
+            else (no)
+                :motor->direction = false (backward);
+                :motor->current_step = (current_step + 3) % 4;
+                :motor->current_position--;
+            endif
+            
+            :set_motor_step(motor, current_step);
+            :Apply GPIO pin states according to step sequence;
+            :vTaskDelay(speed_delay_ms);
+            
+        else (no)
+            :Target position reached;
+            :motor->is_moving = false;
+            :motor_stop_pins(motor);
+            :ESP_LOGI("Reached target position: %d", current_position);
+            break
+        endif
+    repeat while (Position != target?)
+else (no)
+    :Motor not moving;
+    :motor_stop_pins(motor) for power saving;
+    :Longer idle delay (100ms);
+endif
+
+|Status Reporting|
+if (BLE client subscribed to notifications?) then (yes)
+    fork
+        :Update position characteristic;
+        :ble_gatts_chr_updated(position_handle);
+    fork again
+        :Update status characteristic;
+        :Send motor status data;
+        :Include position, fault status;
+    end fork
+else (no)
+    :No notifications needed;
+endif
+
+:Continue motor task loop;
+
+note right : Command Queue:\n• Thread-safe communication\n• 10 message capacity\n• 100ms send timeout\n• 10ms receive polling
+
+note left : Step Sequence:\nStep 0: AIN1=1, AIN2=0, BIN1=1, BIN2=0\nStep 1: AIN1=0, AIN2=1, BIN1=1, BIN2=0\nStep 2: AIN1=0, AIN2=1, BIN1=0, BIN2=1\nStep 3: AIN1=1, AIN2=0, BIN1=0, BIN2=1
+
+note bottom : Real-time Constraints:\n• Step timing: 1-1000ms configurable\n• Fault detection: every step\n• Position update: every step\n• Queue check: every 10ms
+
+stop
+
+@enduml 

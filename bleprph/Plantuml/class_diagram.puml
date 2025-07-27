@@ -1,0 +1,154 @@
+@startuml Class_Diagram
+!theme plain
+
+title ESP32 Stepper Motor Controller - Data Structures
+
+' Main data structures
+class stepper_motor_t {
+    + gpio_num_t ain1_pin
+    + gpio_num_t ain2_pin  
+    + gpio_num_t bin1_pin
+    + gpio_num_t bin2_pin
+    + gpio_num_t sleep_pin
+    + gpio_num_t fault_pin
+    --
+    + int16_t current_position
+    + int16_t target_position
+    + uint16_t speed_delay_ms
+    + int16_t max_position
+    + int16_t min_position
+    + uint8_t current_step
+    + bool is_moving
+    + bool direction
+}
+
+' Enumerations
+enum motor_command_t {
+    MOTOR_CMD_STOP = 0
+    MOTOR_CMD_MOVE_ABSOLUTE
+    MOTOR_CMD_MOVE_RELATIVE
+    MOTOR_CMD_HOME
+    MOTOR_CMD_SET_SPEED
+    MOTOR_CMD_ENABLE
+    MOTOR_CMD_DISABLE
+}
+
+enum motor_status_t {
+    MOTOR_STATUS_IDLE = 0
+    MOTOR_STATUS_MOVING
+    MOTOR_STATUS_ERROR
+    MOTOR_STATUS_DISABLED  
+}
+
+enum system_status_t {
+    SYSTEM_STATUS_INIT = 0
+    SYSTEM_STATUS_READY
+    SYSTEM_STATUS_RUNNING
+    SYSTEM_STATUS_ERROR
+    SYSTEM_STATUS_TESTING
+}
+
+enum system_error_t {
+    ERR_MOTOR_FAULT = 0x1000
+    ERR_BLE_INIT_FAILED
+    ERR_MOTOR_INIT_FAILED
+    ERR_INVALID_COMMAND
+    ERR_HARDWARE_FAULT
+}
+
+' Internal structures (private)
+class motor_cmd_msg_t <<Internal>> {
+    + motor_command_t command
+    + int16_t parameter
+}
+
+' Function interfaces (showing key APIs)
+class StepperMotorAPI <<Interface>> {
+    + esp_err_t stepper_motor_init(stepper_motor_t*)
+    + esp_err_t stepper_motor_move_to_position(stepper_motor_t*, int16_t)
+    + esp_err_t stepper_motor_move_relative(stepper_motor_t*, int16_t)
+    + esp_err_t stepper_motor_home(stepper_motor_t*)
+    + esp_err_t stepper_motor_stop(stepper_motor_t*)
+    + esp_err_t stepper_motor_set_speed(stepper_motor_t*, uint16_t)
+    + motor_status_t stepper_motor_get_status(stepper_motor_t*)
+    + int16_t stepper_motor_get_position(stepper_motor_t*)
+    + bool stepper_motor_is_fault(stepper_motor_t*)
+}
+
+class BLEPeripheralAPI <<Interface>> {
+    + esp_err_t ble_peripheral_init(void)
+    + esp_err_t ble_peripheral_start_advertising(void)
+    + esp_err_t ble_peripheral_stop_advertising(void)
+    + bool ble_peripheral_is_connected(void)
+    + uint16_t ble_peripheral_get_conn_handle(void)
+}
+
+class GATTServerAPI <<Interface>> {
+    + esp_err_t gatt_svr_init(void)
+    + void gatt_svr_set_motor(void*)
+    + void gatt_svr_register_cb(ble_gatt_register_ctxt*, void*)
+}
+
+class MotorTestAPI <<Interface>> {
+    + esp_err_t motor_test_hardware(stepper_motor_t*)
+    + esp_err_t motor_test_movement(stepper_motor_t*)
+    + esp_err_t motor_test_position_accuracy(stepper_motor_t*)
+    + esp_err_t motor_test_speed_variations(stepper_motor_t*)
+    + esp_err_t motor_test_suite(stepper_motor_t*)
+}
+
+' Configuration constants
+class HardwareConfig <<Configuration>> {
+    + DEFAULT_MOTOR_AIN1 : GPIO_NUM_26
+    + DEFAULT_MOTOR_AIN2 : GPIO_NUM_27
+    + DEFAULT_MOTOR_BIN1 : GPIO_NUM_14
+    + DEFAULT_MOTOR_BIN2 : GPIO_NUM_12
+    + DEFAULT_MOTOR_SLEEP : GPIO_NUM_13
+    + DEFAULT_MOTOR_FAULT : GPIO_NUM_25
+    --
+    + DEFAULT_LED1_GPIO : GPIO_NUM_2
+    + DEFAULT_LED2_GPIO : GPIO_NUM_4
+    + DEFAULT_LED3_GPIO : GPIO_NUM_5
+    + DEFAULT_LED4_GPIO : GPIO_NUM_18
+}
+
+class SystemConfig <<Configuration>> {
+    + DEVICE_NAME : "ESP32_StepperMotor"
+    + FIRMWARE_VERSION : "1.0.0"
+    + BLE_DEVICE_NAME : DEVICE_NAME
+    + BLE_ADV_INTERVAL_MIN : 0x20
+    + BLE_ADV_INTERVAL_MAX : 0x40
+    --
+    + MOTOR_DEFAULT_SPEED : 10
+    + MOTOR_MIN_SPEED : 1
+    + MOTOR_MAX_SPEED : 1000
+}
+
+class MotorConfig <<Configuration>> {
+    + STEPS_PER_REVOLUTION : 200
+    + MICROSTEPS : 1
+    + THREAD_PITCH_MM : 2.0
+    + STEPS_PER_MM : calculated
+    + STROKE_LENGTH_MM : 50
+}
+
+' Relationships
+StepperMotorAPI --> stepper_motor_t : operates on
+StepperMotorAPI --> motor_command_t : uses
+StepperMotorAPI --> motor_status_t : returns
+
+stepper_motor_t --> HardwareConfig : initialized from
+motor_cmd_msg_t --> motor_command_t : contains
+
+GATTServerAPI --> stepper_motor_t : references
+MotorTestAPI --> stepper_motor_t : tests
+
+BLEPeripheralAPI --> SystemConfig : uses
+stepper_motor_t --> MotorConfig : configured by
+
+' Notes
+note right of stepper_motor_t : Main motor control\nstructure containing\nhardware pins and\nruntime state
+note right of motor_cmd_msg_t : Internal queue message\nfor thread-safe\ncommand processing
+note bottom of HardwareConfig : Centralized pin\ndefinitions allow\neasy hardware\ncustomization
+
+@enduml 
