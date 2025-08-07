@@ -10,12 +10,18 @@
 extern "C" {
 #endif
 
-// Motor configuration constants
-#define STEPS_PER_REVOLUTION    200     // 1.8° stepper motor
+// Motor configuration constants - CORRECTED FOR YOUR LINEAR ACTUATOR
+// Based on Amazon listing: 18° step angle, 0.1" screw diameter, 3.1" effective stroke
+#define STEPS_PER_REVOLUTION    20      // 18° step angle = 360°/18° = 20 steps/rev
 #define MICROSTEPS             1       // No microstepping with DRV8833
-#define THREAD_PITCH_MM        2.0     // 2mm thread pitch
-#define STEPS_PER_MM           (STEPS_PER_REVOLUTION * MICROSTEPS / THREAD_PITCH_MM)
-#define STROKE_LENGTH_MM       50      // 50mm stroke length
+#define THREAD_PITCH_MM        0.5     // Fine thread pitch for 0.1" screw (~0.5mm)
+#define STEPS_PER_MM           (STEPS_PER_REVOLUTION / THREAD_PITCH_MM)  // = 40 steps/mm
+#define STROKE_LENGTH_MM       78.74   // 3.1 inches = 78.74mm effective stroke
+
+// Alternative calibration values (uncomment to test):
+// #define STEPS_PER_MM           30      // If 40 is too high
+// #define STEPS_PER_MM           50      // If 40 is too low
+// #define STEPS_PER_MM           25      // Conservative estimate
 
 // Motor command enumeration
 typedef enum {
@@ -78,4 +84,4 @@ void stepper_motor_test_movement(stepper_motor_t *motor);
 }
 #endif
 
-#endif // STEPPER_MOTOR_H 
+#endif // STEPPER_MOTOR_H
