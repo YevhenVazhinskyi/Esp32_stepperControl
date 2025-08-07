@@ -15,7 +15,7 @@ extern "C" {
 #define MICROSTEPS             1       // No microstepping with DRV8833
 #define THREAD_PITCH_MM        2.0     // 2mm thread pitch
 #define STEPS_PER_MM           (STEPS_PER_REVOLUTION * MICROSTEPS / THREAD_PITCH_MM)
-#define STROKE_LENGTH_MM       50      // 50mm stroke length
+#define STROKE_LENGTH_MM       20      // 20mm stroke length (calibrated for 2000 steps max)
 
 // Motor command enumeration
 typedef enum {
@@ -25,7 +25,8 @@ typedef enum {
     MOTOR_CMD_HOME,
     MOTOR_CMD_SET_SPEED,
     MOTOR_CMD_ENABLE,
-    MOTOR_CMD_DISABLE
+    MOTOR_CMD_DISABLE,
+    MOTOR_CMD_CALIBRATE
 } motor_command_t;
 
 // Motor status enumeration
@@ -62,6 +63,7 @@ esp_err_t stepper_motor_init(stepper_motor_t *motor);
 esp_err_t stepper_motor_move_to_position(stepper_motor_t *motor, int16_t position);
 esp_err_t stepper_motor_move_relative(stepper_motor_t *motor, int16_t steps);
 esp_err_t stepper_motor_home(stepper_motor_t *motor);
+esp_err_t stepper_motor_calibrate(stepper_motor_t *motor);
 esp_err_t stepper_motor_stop(stepper_motor_t *motor);
 esp_err_t stepper_motor_set_speed(stepper_motor_t *motor, uint16_t speed_delay_ms);
 esp_err_t stepper_motor_enable(stepper_motor_t *motor);
@@ -78,4 +80,4 @@ void stepper_motor_test_movement(stepper_motor_t *motor);
 }
 #endif
 
-#endif // STEPPER_MOTOR_H 
+#endif // STEPPER_MOTOR_H

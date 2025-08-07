@@ -48,7 +48,24 @@ static esp_err_t init_motor(void) {
         return ret;
     }
     
-    ESP_LOGI(TAG, "Motor initialized successfully");
+    // Physical homing: move far left to ensure we hit the physical limit
+    ESP_LOGI(TAG, "Performing physical homing to left limit...");
+    ret = stepper_motor_move_relative(&g_motor, -2500); // Move 2500 steps left (more than max range)
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to move motor for homing: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    // Wait for movement to complete and hit physical limit
+    ESP_LOGI(TAG, "Waiting for motor to reach left limit...");
+    vTaskDelay(pdMS_TO_TICKS(8000)); // 8 seconds to reach left limit
+    
+    // Reset position to 0 now that we're at true left limit
+    ESP_LOGI(TAG, "Setting current position as home (position 0)");
+    g_motor.current_position = 0;
+    g_motor.target_position = 0;
+    
+    ESP_LOGI(TAG, "Motor initialized and physically homed to left limit");
     return ESP_OK;
 }
 

@@ -99,6 +99,11 @@ esp_err_t stepper_motor_init(stepper_motor_t *motor) {
         return ESP_ERR_NO_MEM;
     }
     
+    // Auto-calibrate on startup after a short delay
+    vTaskDelay(pdMS_TO_TICKS(2000)); // Wait 2 seconds for system to stabilize
+    ESP_LOGI(TAG, "Starting auto-calibration...");
+    stepper_motor_calibrate(motor);
+    
     ESP_LOGI(TAG, "Stepper motor initialized successfully");
     return ESP_OK;
 }
@@ -158,6 +163,25 @@ esp_err_t stepper_motor_home(stepper_motor_t *motor) {
     
     if (xQueueSend(motor_command_queue, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to send home command");
+        return ESP_ERR_TIMEOUT;
+    }
+    
+    return ESP_OK;
+}
+
+// Calibrate motor (move LEFT for 15 seconds to find physical limit, then set as zero)
+esp_err_t stepper_motor_calibrate(stepper_motor_t *motor) {
+    if (motor == NULL || motor_command_queue == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    motor_cmd_msg_t cmd = {
+        .command = MOTOR_CMD_CALIBRATE,
+        .parameter = 0
+    };
+    
+    if (xQueueSend(motor_command_queue, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to send calibrate command");
         return ESP_ERR_TIMEOUT;
     }
     
@@ -301,6 +325,29 @@ void stepper_motor_task(void *pvParameters) {
                     motor->target_position = 0;
                     motor->is_moving = true;
                     ESP_LOGI(TAG, "Homing motor");
+                    break;
+                    
+                case MOTOR_CMD_CALIBRATE:
+                    ESP_LOGI(TAG, "Starting calibration - moving LEFT for 30 seconds");
+                    
+                    // Move LEFT for 30 seconds to find physical limit
+                    TickType_t start_time = xTaskGetTickCount();
+                    TickType_t thirty_seconds = pdMS_TO_TICKS(30000);
+                    
+                    while ((xTaskGetTickCount() - start_time) < thirty_seconds) {
+                        // Move LEFT (backward direction)
+                        motor->current_step = (motor->current_step + 3) % 4;
+                        set_motor_step(motor, motor->current_step);
+                        vTaskDelay(pdMS_TO_TICKS(motor->speed_delay_ms));
+                    }
+                    
+                    // Stop motor and set this as position 0 (LEFT limit)
+                    motor_stop_pins(motor);
+                    motor->current_position = 0;
+                    motor->target_position = 0;
+                    motor->is_moving = false;
+                    
+                    ESP_LOGI(TAG, "Calibration complete - LEFT position set as 0");
                     break;
                     
                 case MOTOR_CMD_SET_SPEED:
