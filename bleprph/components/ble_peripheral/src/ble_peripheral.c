@@ -193,7 +193,7 @@ esp_err_t ble_peripheral_init(void) {
     
     // Set device name
     ble_svc_gap_device_name_set(BLE_DEVICE_NAME);
-    ble_svc_gap_appearance_set(BLE_APPEARANCE);
+    ble_svc_gap_device_appearance_set(BLE_APPEARANCE);
     
     // Initialize GATT server
     ret = gatt_svr_init();

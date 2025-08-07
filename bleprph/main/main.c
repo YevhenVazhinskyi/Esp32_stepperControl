@@ -44,7 +44,7 @@ static esp_err_t init_motor(void) {
     
     esp_err_t ret = stepper_motor_init(&g_motor);
     if (ret != ESP_OK) {
-     /   ESP_LOGE(TAG, "Failed to initialize motor: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to initialize motor: %s", esp_err_to_name(ret));
         return ret;
     }
     
@@ -62,7 +62,7 @@ static esp_err_t init_ble(void) {
         return ret;
     }
     
-    // Set motor instance for GATT servexa
+    // Set motor instance for GATT server
     gatt_svr_set_motor(&g_motor);
     
     ESP_LOGI(TAG, "BLE initialized successfully");

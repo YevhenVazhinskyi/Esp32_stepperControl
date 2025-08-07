@@ -6,9 +6,8 @@ idf_component_register(
         "include"
     REQUIRES 
         bt
-        nimble
         driver
-        esp_log
+        log
         freertos
         stepper_motor
         common

@@ -6,5 +6,5 @@ idf_component_register(
     REQUIRES 
         stepper_motor
         freertos
-        esp_log
+        log
 ) 
