@@ -1,0 +1,10 @@
+@startuml Test_Include
+!include ../shared_components/common_styles.puml
+
+title Test Activity Diagram with Include
+
+start
+:Test activity with styling;
+stop
+
+@enduml 

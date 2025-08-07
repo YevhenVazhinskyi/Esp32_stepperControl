@@ -1,0 +1,94 @@
+@startuml GPIO_Hardware_Control
+!include ../../shared_components/common_styles.puml
+
+title Hardware GPIO Control - Motor and LED Operations
+
+|GPIO Subsystem|
+start
+
+fork
+    |Motor GPIO Control|
+    :Motor step command received;
+    :Extract step pattern from step_sequence[step];
+    
+    |4-Phase Stepper Control|
+    partition "Parallel GPIO Operations" {
+        :gpio_set_level(AIN1, pattern[0]);
+        :gpio_set_level(AIN2, pattern[1]);
+        :gpio_set_level(BIN1, pattern[2]);
+        :gpio_set_level(BIN2, pattern[3]);
+    }
+    
+    |Hardware Validation|
+    :Read back GPIO states for verification;
+    if (All pins set correctly?) then (yes)
+        :Step execution successful;
+    else (no)
+        :GPIO error - log warning;
+    endif
+    
+fork again
+    |LED GPIO Control|
+    :LED control command received;
+    :Validate LED index (0-3);
+    :Validate state (0 or 1);
+    
+    |LED Operations|
+    switch (Operation type)
+    case (Set LED State)
+        :gpio_set_level(led_gpios[index], state);
+        :led_states[index] = state;
+        
+    case (Flash LED)
+        :gpio_set_level(led_gpios[index], 1);
+        :vTaskDelay(flash_duration_ms);
+        :gpio_set_level(led_gpios[index], 0);
+        
+    case (LED Test Sequence)
+        repeat
+            :gpio_set_level(led_gpios[i], 1);
+            :vTaskDelay(200ms);
+            :gpio_set_level(led_gpios[i], 0);
+            :i = (i + 1) % 4;
+        repeat while (Test sequence active)
+        
+    endswitch
+    
+fork again
+    |Motor Enable/Sleep Control|
+    :Motor enable/disable command;
+    
+    if (Enable motor?) then (yes)
+        :gpio_set_level(SLEEP_PIN, 1); // DRV8833 enable
+        :Wait 100ms for driver stabilization;
+        :Motor driver active;
+    else (no)
+        :gpio_set_level(SLEEP_PIN, 0); // DRV8833 sleep
+        :All motor pins LOW for safety;
+        :Motor driver in sleep mode;
+    endif
+    
+fork again
+    |Fault Detection|
+    repeat
+        :gpio_get_level(FAULT_PIN);
+        if (FAULT pin LOW?) then (yes)
+            :Hardware fault detected;
+            :Trigger fault interrupt/callback;
+            :Emergency stop all motor operations;
+        endif
+        :vTaskDelay(1ms); // Continuous monitoring
+    repeat while (System active)
+    
+end fork
+
+|GPIO Configuration Validation|
+:Verify all GPIO pins configured correctly;
+:Check pull-up/pull-down settings;
+:Validate interrupt configurations;
+
+note right : Hardware Specifications:\n• Motor: 4-phase stepper via DRV8833\n• LEDs: 4x status indicators\n• Fault: Active-low detection\n• Sleep: Active-high enable\n• Update Rate: 1-1000ms configurable
+
+stop
+
+@enduml 

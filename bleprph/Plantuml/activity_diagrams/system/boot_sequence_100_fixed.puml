@@ -1,0 +1,77 @@
+@startuml ESP32_Boot_Sequence
+!theme plain
+
+' Inline styling
+skinparam backgroundColor #FAFAFA
+skinparam activity {
+  backgroundColor #F3E5F5
+  borderColor #7B1FA2
+  fontColor #4A148C
+}
+
+title ESP32 System Boot Sequence - Hardware to Application
+
+|Hardware Layer|
+start
+:Power-on Reset;
+:ESP32 ROM Boot;
+:Load Bootloader;
+
+|Bootloader|
+:Initialize hardware;
+:Load application partition;
+:Jump to app_main();
+
+|FreeRTOS Kernel|
+:Start FreeRTOS scheduler;
+:Initialize heap;
+:Create idle task;
+
+|Application Entry|
+:app_main() entry point;
+
+|NVS Subsystem|
+:nvs_flash_init();
+if (NVS corrupted?) then (yes)
+    :nvs_flash_erase();
+    :nvs_flash_init() retry;
+    if (Retry failed?) then (yes)
+        :Fatal error - halt system;
+        stop
+    endif
+endif
+:NVS ready;
+
+|Component Initialization|
+fork
+    |Motor Hardware|
+    :Configure motor GPIO pins;
+    :Set initial pin states;
+    :Initialize motor structure;
+    :Create motor task;
+    :Create command queue;
+fork again
+    |BLE Stack|
+    :nimble_port_init();
+    :Configure BLE host callbacks;
+    :Initialize GATT services;
+    :Register characteristics;
+fork again
+    |System Services|
+    :Initialize logging;
+    :Setup watchdog timer;
+    :Configure system clocks;
+end fork
+
+:All subsystems initialized;
+:system_status = SYSTEM_STATUS_READY;
+
+|Main Application|
+:Create app_main_task;
+:Begin system operation;
+
+note bottom : Boot time: ~2-3 seconds\nCritical path: NVS -> Motor -> BLE -> Tasks
+
+stop
+
+@enduml 

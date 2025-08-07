@@ -1,0 +1,150 @@
+@startuml Fault_Detection_Recovery_System
+!theme plain
+
+' Inline styling to avoid include issues
+skinparam backgroundColor #FAFAFA
+skinparam activity {
+  backgroundColor #F3E5F5
+  borderColor #7B1FA2
+  fontColor #4A148C
+}
+
+title Comprehensive Fault Detection and Recovery System
+
+|Fault Detection|
+start
+
+fork
+    |Hardware Fault Monitoring|
+    repeat
+        :gpio_get_level(FAULT_PIN);
+        if (DRV8833 FAULT pin LOW?) then (yes)
+            :Hardware fault detected;
+            :Classify fault type;
+            
+            |Fault Classification|
+            switch (Fault symptoms)
+            case (Overcurrent)
+                :Current limit exceeded;
+                :ESP_LOGE("Motor overcurrent fault");
+                
+            case (Overtemperature)
+                :Thermal shutdown triggered;
+                :ESP_LOGE("Motor driver overtemp");
+                
+            case (Short Circuit)
+                :Output short detected;
+                :ESP_LOGE("Motor short circuit");
+                
+            endswitch
+            
+            |Immediate Safety Actions|
+            :motor->is_moving = false;
+            :motor_stop_pins(motor);
+            :gpio_set_level(SLEEP_PIN, 0);
+            :system_status = SYSTEM_STATUS_ERROR;
+            
+        endif
+        :vTaskDelay(1ms);
+    repeat while (System active)
+    
+fork again
+    |Software Fault Monitoring|
+    repeat
+        |Watchdog Monitoring|
+        :esp_task_wdt_reset();
+        
+        |Stack Overflow Detection|
+        :uxTaskGetStackHighWaterMark(motor_task_handle);
+        if (Stack usage > 90%?) then (yes)
+            :ESP_LOGE("Motor task stack overflow risk");
+            :Trigger controlled shutdown;
+        endif
+        
+        |Queue Health Check|
+        :uxQueueMessagesWaiting(motor_command_queue);
+        if (Queue full for >5 seconds?) then (yes)
+            :ESP_LOGE("Motor queue deadlock detected");
+            :Clear queue contents;
+            :Reset motor task;
+        endif
+        
+        :vTaskDelay(100ms);
+    repeat while (System active)
+    
+end fork
+
+|Error Recovery Process|
+if (Fault detected?) then (yes)
+    |Recovery Strategy Selection|
+    switch (system_status)
+    case (SYSTEM_STATUS_ERROR)
+        :Initialize recovery attempt counter = 0;
+        
+        repeat
+            |Recovery Attempt|
+            :recovery_attempt++;
+            :ESP_LOGI("Recovery attempt", recovery_attempt);
+            
+            |Wait Period|
+            :vTaskDelay(5000ms);
+            
+            |Hardware Re-test|
+            :gpio_get_level(FAULT_PIN);
+            if (FAULT pin HIGH?) then (yes)
+                |Hardware Recovery Test|
+                :gpio_set_level(SLEEP_PIN, 1);
+                :vTaskDelay(100ms);
+                
+                |Basic Function Test|
+                :Test motor enable/disable;
+                :Test single step operation;
+                :Check fault pin remains HIGH;
+                
+                if (All tests pass?) then (yes)
+                    |Recovery Successful|
+                    :ESP_LOGI("Hardware fault cleared");
+                    :system_status = SYSTEM_STATUS_READY;
+                    :Reset error counters;
+                    break
+                else (no)
+                    :ESP_LOGW("Hardware test failed");
+                    :gpio_set_level(SLEEP_PIN, 0);
+                endif
+            endif
+            
+        repeat while (recovery_attempt < 3)
+        
+        |Recovery Failed|
+        if (All recovery attempts failed?) then (yes)
+            :ESP_LOGE("Unable to recover from hardware fault");
+            :Enter safe mode - limited functionality;
+            :system_status = SYSTEM_STATUS_ERROR;
+            :Disable motor operations permanently;
+        endif
+        
+    endswitch
+endif
+
+|Safe Mode Operations|
+if (In safe mode?) then (yes)
+    |Limited Functionality|
+    :BLE communication active;
+    :LED control functional;
+    :Status reporting available;
+    :Motor operations disabled;
+    
+    |Diagnostic Mode|
+    repeat
+        :Report system status;
+        :Log diagnostic information;
+        :Monitor for user reset command;
+        :vTaskDelay(1000ms);
+    repeat while (In safe mode)
+endif
+
+note right : Recovery Parameters:\n• Max recovery attempts: 3\n• Recovery delay: 5 seconds\n• Hardware test timeout: 100ms\n• Safe mode: BLE + LED only
+
+stop
+
+@enduml 

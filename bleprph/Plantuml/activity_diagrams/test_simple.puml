@@ -1,0 +1,14 @@
+@startuml Simple_Test
+title Test Activity Diagram
+
+start
+:Test activity;
+if (Test condition?) then (yes)
+    :Success path;
+else (no)
+    :Error path;
+endif
+:End activity;
+stop
+
+@enduml 

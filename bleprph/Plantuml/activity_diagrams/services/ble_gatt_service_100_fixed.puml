@@ -1,0 +1,119 @@
+@startuml BLE_GATT_Service_Handling
+!theme plain
+
+' Inline styling
+skinparam backgroundColor #FAFAFA
+skinparam activity {
+  backgroundColor #F3E5F5
+  borderColor #7B1FA2
+  fontColor #4A148C
+}
+
+title BLE GATT Service Request Processing
+
+|BLE Host Task (NimBLE)|
+start
+:GATT request received;
+:Extract connection handle, attribute handle;
+
+|Service Identification|
+if (LED Service handles?) then (yes)
+    |LED Service Handler|
+    :led_svc_access() callback;
+    :Find LED index from handle;
+    
+    switch (Operation type)
+    case (BLE_GATT_ACCESS_OP_READ_CHR)
+        :ESP_LOGI("LED read; conn_handle");
+        :return os_mbuf_append(&led_states[index]);
+        
+    case (BLE_GATT_ACCESS_OP_WRITE_CHR)
+        :ESP_LOGI("LED write; conn_handle");
+        :gatt_svr_write() - extract new state;
+        :led_control(led_index, new_state);
+        |GPIO Control|
+        :gpio_set_level(led_gpios[index], new_state);
+        :led_states[index] = new_state;
+        :return success;
+    endswitch
+    
+else (no)
+    if (Motor Service handles?) then (yes)
+        |Motor Service Handler|
+        :motor_svc_access() callback;
+        :flash_led(0, 50);
+        
+        if (Position characteristic?) then (yes)
+            switch (Operation type)
+            case (READ)
+                :position = stepper_motor_get_position(g_motor);
+                :return os_mbuf_append(&position);
+                
+            case (WRITE)
+                :gatt_svr_write() - extract new_position;
+                :flash_led(0, 200);
+                :stepper_motor_move_to_position(g_motor, new_position);
+                :return success;
+            endswitch
+            
+        else (no)
+            if (Command characteristic?) then (yes)
+                |Command Processing|
+                :Extract 3-byte command packet;
+                :command = cmd_data[0];
+                :parameter = (cmd_data[2] << 8) | cmd_data[1];
+                
+                switch (command)
+                case (MOTOR_CMD_STOP)
+                    :flash_led(3, 100);
+                    :stepper_motor_stop(g_motor);
+                    
+                case (MOTOR_CMD_MOVE_ABSOLUTE)
+                    :flash_led(0, 200);
+                    :stepper_motor_move_to_position(g_motor, parameter);
+                    
+                case (MOTOR_CMD_MOVE_RELATIVE)
+                    :flash_led(1, 200);
+                    :stepper_motor_move_relative(g_motor, parameter);
+                    
+                case (MOTOR_CMD_HOME)
+                    :flash_led(2, 500);
+                    :stepper_motor_home(g_motor);
+                    
+                case (MOTOR_CMD_SET_SPEED)
+                    :flash_led(0, 100);
+                    :vTaskDelay(50ms);
+                    :flash_led(0, 100);
+                    :stepper_motor_set_speed(g_motor, parameter);
+                    
+                case (MOTOR_CMD_ENABLE)
+                    :led_control(1, 1);
+                    :stepper_motor_enable(g_motor);
+                    
+                case (MOTOR_CMD_DISABLE)
+                    :led_control(1, 0);
+                    :stepper_motor_disable(g_motor);
+                    
+                endswitch
+                :return success;
+                
+            else (no)
+                if (Status characteristic?) then (yes)
+                    :status = stepper_motor_get_status(g_motor);
+                    :position = stepper_motor_get_position(g_motor);
+                    :fault = stepper_motor_is_fault(g_motor);
+                    :Pack status response;
+                    :return os_mbuf_append(&status_data);
+                endif
+            endif
+        endif
+    endif
+endif
+
+:Send GATT response to client;
+
+note right : Response Time: <30ms\nDirect API calls to motor\nVisual feedback via LEDs\nThread-safe operations
+
+stop
+
+@enduml 

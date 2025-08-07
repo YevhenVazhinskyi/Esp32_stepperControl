@@ -1,0 +1,87 @@
+@startuml BLE_Motor_Command_Sequence
+!include ../shared_components/common_styles.puml
+
+title ESP32 Stepper Motor Controller - BLE Motor Command Sequence
+
+participant "Mobile\nApp" as User
+participant "BLE\nGATT" as GATT
+participant "Motor\nAPI" as API
+participant "Motor\nTask" as Task
+participant "Hardware" as HW
+
+== Motor Command Processing ==
+
+User -> GATT : Write motor command characteristic
+note right : Command format:\n[cmd:1][param:2]
+
+GATT -> GATT : Parse command packet
+GATT -> GATT : Extract command and parameter
+
+switch Command Type
+case MOTOR_CMD_MOVE_ABSOLUTE
+    GATT -> API : stepper_motor_move_to_position(motor, position)
+    API -> Task : Queue MOVE_ABSOLUTE command
+    GATT --> User : Command accepted
+    
+    Task -> Task : Set target_position = position
+    Task -> Task : Set is_moving = true
+    
+    loop Until target reached
+        Task -> HW : Apply step sequence
+        Task -> Task : Update current_position
+        Task -> Task : Apply speed delay
+        Task -> HW : Check fault pin
+        alt Fault detected
+            Task -> Task : Stop movement
+            Task -> GATT : Fault notification
+            GATT --> User : Fault alert
+            break
+        end
+    end
+    
+    Task -> GATT : Position update notification
+    GATT --> User : New position
+
+case MOTOR_CMD_HOME
+    GATT -> API : stepper_motor_home(motor)
+    API -> Task : Queue HOME command
+    GATT --> User : Command accepted
+    
+    Task -> Task : Set target_position = 0
+    Task -> Task : Set is_moving = true
+    
+    loop Until home reached
+        Task -> HW : Apply step sequence
+        Task -> Task : Update current_position
+        Task -> Task : Apply speed delay
+    end
+    
+    Task -> GATT : Home complete notification
+    GATT --> User : Home status
+
+case MOTOR_CMD_STOP
+    GATT -> API : stepper_motor_stop(motor)
+    API -> Task : Queue STOP command
+    GATT --> User : Command accepted
+    
+    Task -> Task : Set is_moving = false
+    Task -> HW : Stop all motor pins
+    
+    Task -> GATT : Stop complete notification
+    GATT --> User : Stop confirmation
+
+case MOTOR_CMD_SET_SPEED
+    GATT -> API : stepper_motor_set_speed(motor, speed)
+    API -> Task : Queue SET_SPEED command
+    GATT --> User : Command accepted
+    
+    Task -> Task : Update speed_delay_ms
+    
+    Task -> GATT : Speed updated notification
+    GATT --> User : Speed confirmation
+
+end
+
+note over User, HW : All commands processed\nthrough direct API calls\nwith immediate queuing
+
+@enduml 

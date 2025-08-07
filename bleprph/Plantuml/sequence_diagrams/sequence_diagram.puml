@@ -1,0 +1,232 @@
+@startuml Combined_Sequence_Overview
+!theme plain
+
+title ESP32 Stepper Motor Controller - Combined System Sequence Overview
+
+participant "User/\nMobile App" as User
+participant "BLE\nStack" as BLE
+participant "System\nController" as System
+participant "Motor\nAPI" as Motor
+participant "Hardware\nLayer" as Hardware
+participant "Error\nHandler" as ErrorHandler
+
+== System Lifecycle ==
+
+=== Initialization Phase ===
+System -> System : Power on / Reset
+System -> System : Initialize NVS Flash
+System -> Motor : Initialize motor component
+Motor -> Hardware : Configure GPIO pins
+Motor -> Motor : Create motor task & queue
+Motor --> System : Motor ready
+
+System -> BLE : Initialize BLE peripheral
+BLE -> BLE : Setup NimBLE stack
+BLE -> BLE : Register GATT services
+BLE -> BLE : Set motor reference (gatt_svr_set_motor)
+BLE -> BLE : Start advertising
+BLE --> System : BLE ready
+
+System -> System : system_status = READY
+System -> System : Start main monitoring task
+note over System : READY state handles full operation
+
+note over System, Hardware : System fully initialized\nReady for user interaction
+
+=== Runtime Operations Phase ===
+
+== BLE Connection & Communication ==
+User -> BLE : Scan and connect
+BLE -> BLE : Establish connection
+BLE -> System : Connection established
+
+loop BLE Communication Session
+    User -> BLE : Send motor command
+    BLE -> BLE : Parse GATT request
+    
+    alt LED Control Command
+        BLE -> Hardware : Set LED state
+        Hardware --> BLE : LED updated
+        BLE --> User : Command response
+        
+    else Motor Control Command
+        BLE -> Motor : Direct stepper motor API call
+        Motor -> Motor : Process command in task
+        
+        alt Movement Command
+            Motor -> Hardware : Execute step sequence
+            loop Motor Movement
+                Motor -> Hardware : Apply step pattern
+                Motor -> Motor : Update position
+                Motor -> Hardware : Check fault pin
+                Hardware --> Motor : Fault status
+                
+                alt No fault
+                    Motor -> Motor : Continue movement
+                else Fault detected
+                    Motor -> ErrorHandler : Report hardware fault
+                    break
+                end
+            end
+            
+            Motor -> BLE : Send position notification
+            BLE --> User : Real-time position update
+            
+        else Configuration Command
+            Motor -> Motor : Update motor settings
+            Motor -> BLE : Send status update
+            BLE --> User : Configuration confirmed
+        end
+        
+        BLE --> User : Command response
+    end
+end
+
+== Concurrent System Monitoring ==
+par User Operations
+    loop Continuous BLE Operations
+        User -> BLE : Send commands
+        BLE -> Motor : Process requests
+        Motor -> Hardware : Execute operations
+        Hardware --> User : Real-time feedback
+    end
+    
+and System Health Monitoring
+    loop System Monitoring (every 100ms)
+        System -> Motor : Check fault status
+        Motor -> Hardware : Read fault pin
+        Hardware --> Motor : Pin state
+        Motor --> System : Fault status
+        
+        alt No fault detected
+            System -> System : Continue normal operation
+        else Fault detected
+            System -> ErrorHandler : Initiate error handling
+            
+            == Error Recovery Sequence ==
+            ErrorHandler -> Motor : Stop current operations
+            Motor -> Hardware : Disable motor driver
+            ErrorHandler -> ErrorHandler : Flash error LEDs
+            
+            loop Recovery Attempts (max 3)
+                ErrorHandler -> ErrorHandler : Wait 5 seconds
+                ErrorHandler -> Motor : Re-check fault status
+                Motor -> Hardware : Read fault pin
+                Hardware --> Motor : Pin state
+                
+                alt Fault cleared
+                    ErrorHandler -> Motor : Re-enable motor
+                    Motor -> Hardware : Test basic functionality
+                    Hardware --> Motor : Test results
+                    
+                    alt Test passed
+                        ErrorHandler -> System : Recovery successful
+                        System -> System : Resume normal operation
+                        break
+                    else Test failed
+                        ErrorHandler -> ErrorHandler : Retry recovery
+                    end
+                else Fault persists
+                    ErrorHandler -> ErrorHandler : Continue retry loop
+                end
+            end
+            
+            alt Recovery successful
+                System -> System : Enhanced monitoring mode
+                System -> BLE : Notify client of recovery
+                BLE --> User : System status update
+            else Recovery failed
+                System -> System : Enter safe mode
+                System -> BLE : Notify client of failure
+                BLE --> User : Error notification
+            end
+        end
+    end
+    
+and BLE Connection Management
+    loop BLE Connection Lifecycle
+        alt Client connected
+            BLE -> BLE : Process GATT operations
+            BLE -> BLE : Send notifications
+        else Client disconnected
+            BLE -> BLE : Clean up connection
+            BLE -> BLE : Restart advertising
+            BLE -> BLE : Wait for new connection
+        end
+    end
+end
+
+== Optional Test Execution ==
+opt Test Suite Enabled
+    System -> System : Check CONFIG_ENABLE_MOTOR_TESTS
+    System -> Motor : Execute test suite
+    
+    par Hardware Tests
+        Motor -> Hardware : Validate GPIO configuration
+        Motor -> Hardware : Test driver response
+        Hardware --> Motor : Test results
+    and Movement Tests
+        Motor -> Hardware : Execute test movements
+        Motor -> Motor : Validate positioning
+        Hardware --> Motor : Movement results
+    and Accuracy Tests
+        Motor -> Hardware : Test position accuracy
+        Motor -> Motor : Measure precision
+        Hardware --> Motor : Accuracy results
+    and Speed Tests
+        Motor -> Hardware : Test speed variations
+        Motor -> Motor : Measure timing
+        Hardware --> Motor : Speed results
+    end
+    
+    Motor -> Motor : Analyze test results
+    alt All tests passed
+        Motor -> Hardware : Flash success LEDs
+        Motor -> System : Tests successful
+    else Some tests failed
+        Motor -> Hardware : Flash error LEDs
+        Motor -> System : Test failures detected
+    end
+    
+    Motor -> Hardware : Return to safe state
+    Motor --> System : Test suite complete
+end
+
+== System State Synchronization ==
+note over System, Hardware : State Coordination Points
+
+System -> System : Update system_status
+alt system_status = READY
+    System -> Motor : Enable motor operations
+    System -> BLE : Enable full functionality
+    note over System, BLE : READY state handles full operation
+else system_status = ERROR
+    System -> Motor : Restrict motor operations
+    System -> BLE : Send error notifications
+else system_status = TESTING
+    System -> Motor : Enable test mode
+    System -> BLE : Limit client operations
+end
+
+== Real-time Constraints ==
+note over User, Hardware : Timing Requirements
+
+note right of BLE : BLE Response Times:\n• GATT request: <30ms\n• Notification: <100ms\n• Connection: <3s
+
+note right of Motor : Motor Timing:\n• Step generation: 1-1000ms\n• Queue timeout: 10ms\n• Fault detection: <100ms
+
+note right of System : System Monitoring:\n• Status check: 100ms\n• Error recovery: 5s cycles\n• Test execution: parallel
+
+== Data Flow Summary ==
+User -> BLE : Commands & requests
+BLE -> Motor : Command queue messages
+Motor -> Hardware : GPIO pin control
+Hardware -> Motor : Fault pin status
+Motor -> BLE : Position & status notifications
+BLE -> User : Real-time updates
+System -> ErrorHandler : Fault escalation
+ErrorHandler -> System : Recovery status
+
+note over User, Hardware : Complete system interaction\nfrom user input to hardware response\nwith comprehensive error handling
+
+@enduml 

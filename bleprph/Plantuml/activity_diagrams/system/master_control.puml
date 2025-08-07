@@ -1,0 +1,137 @@
+@startuml Master_System_Control_Flow
+!theme plain
+
+' Inline styling
+skinparam backgroundColor #FAFAFA
+skinparam activity {
+  backgroundColor #F3E5F5
+  borderColor #7B1FA2
+  fontColor #4A148C
+}
+
+title Master System Control - Subsystem Orchestration
+
+|System Controller|
+start
+:System power-on;
+
+|Phase 1: Hardware Bootstrap|
+:Power-on Reset;
+:ESP32 ROM Boot;
+:Load Bootloader;
+:Jump to app_main();
+:Initialize NVS;
+:Configure GPIO pins;
+:Create tasks and queues;
+
+|Phase 2: Subsystem Initialization|
+fork
+    |Motor Subsystem|
+    :Initialize motor hardware;
+    :Configure DRV8833 driver;
+    :Create motor control task;
+    :Motor hardware ready;
+    
+fork again
+    |BLE Subsystem|
+    :Initialize NimBLE stack;
+    :Configure GATT services;
+    :Start advertising;
+    :BLE stack active;
+    
+fork again
+    |Communication Layer|
+    :Create command queues;
+    :Setup inter-task messaging;
+    :Inter-task communication ready;
+    
+end fork
+
+|Phase 3: Task Orchestration|
+fork
+    |Main Control Task|
+    :Start main monitoring loop;
+    :System health checks;
+    :Fault detection;
+    
+fork again
+    |Motor Control Task|
+    :Start motor task;
+    :Process command queue;
+    :Execute movements;
+    
+fork again
+    |BLE Service Task|
+    :Handle GATT requests;
+    :Process BLE commands;
+    :Send notifications;
+    
+end fork
+
+|Phase 4: Runtime Operations|
+repeat
+    |System Health Monitoring|
+    :Check motor task responsiveness;
+    :Verify BLE stack connectivity;
+    :Monitor queue health;
+    :Validate GPIO states;
+    :Check memory usage;
+    :Verify watchdog feeding;
+    
+    |Performance Monitoring|
+    :CPU utilization per core;
+    :Task switching frequency;
+    :Memory fragmentation;
+    :BLE throughput;
+    :Motor command latency;
+    :Error rate tracking;
+    
+    |Load Balancing|
+    if (CPU Core 0 overloaded?) then (yes)
+        :Reduce BLE stack priority;
+        :Optimize packet processing;
+    endif
+    
+    if (CPU Core 1 overloaded?) then (yes)
+        :Optimize motor step timing;
+        :Reduce logging frequency;
+    endif
+    
+    |System State Management|
+    switch (Current system state)
+    case (SYSTEM_STATUS_READY)
+        :All subsystems operational;
+        :Full functionality available;
+        
+    case (SYSTEM_STATUS_ERROR)
+        :Enter fault recovery mode;
+        :Attempt hardware recovery;
+        :Limited functionality;
+        
+    case (SYSTEM_STATUS_TESTING)
+        :Enable test mode protocols;
+        :Coordinate test execution;
+        :Collect test results;
+        
+    endswitch
+    
+    |Adaptive Control|
+    if (High BLE traffic?) then (yes)
+        :Increase motor queue processing priority;
+        :Buffer motor commands;
+    endif
+    
+    if (Rapid motor movements?) then (yes)
+        :Reduce BLE notification frequency;
+        :Batch status updates;
+    endif
+    
+    :vTaskDelay(50ms);
+    
+repeat while (System operational)
+
+note right : Master Control Responsibilities:\n• Subsystem coordination\n• Resource arbitration\n• Performance optimization\n• Fault propagation\n• State synchronization
+
+stop
+
+@enduml 

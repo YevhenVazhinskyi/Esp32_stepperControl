@@ -1,0 +1,85 @@
+@startuml Motor_Control_Use_Cases
+!include ../shared_components/common_styles.puml
+
+title ESP32 Stepper Motor Controller - Motor Control Use Cases
+
+!includesub ../shared_components/common_components.puml!COMMON_ACTORS
+
+' System boundary
+rectangle "Motor Control Subsystem" {
+  
+  package "Basic Motor Operations" {
+    usecase "Enable Motor" as UC_ENABLE
+    usecase "Disable Motor" as UC_DISABLE
+    usecase "Stop Motor" as UC_STOP
+    usecase "Emergency Stop" as UC_EMERGENCY
+  }
+  
+  package "Movement Control" {
+    usecase "Set Motor Position" as UC_POSITION
+    usecase "Move Motor Relative" as UC_RELATIVE
+    usecase "Home Motor" as UC_HOME
+    usecase "Jog Motor" as UC_JOG
+  }
+  
+  package "Speed & Configuration" {
+    usecase "Set Motor Speed" as UC_SPEED
+    usecase "Configure Limits" as UC_LIMITS
+  }
+  
+  package "Monitoring & Status" {
+    usecase "Monitor Motor Position" as UC_MON_POS
+    usecase "Monitor Motor Status" as UC_MON_STATUS
+    usecase "Detect Motor Faults" as UC_FAULT
+  }
+}
+
+' User relationships
+User --> UC_ENABLE : enables
+User --> UC_DISABLE : disables
+User --> UC_POSITION : sets
+User --> UC_RELATIVE : moves
+User --> UC_HOME : homes
+User --> UC_STOP : stops
+User --> UC_SPEED : adjusts
+User --> UC_JOG : jogs
+User --> UC_MON_POS : monitors
+User --> UC_MON_STATUS : monitors
+User --> UC_EMERGENCY : triggers
+
+' ESP32 relationships
+ESP32 --> UC_MON_POS : reports
+ESP32 --> UC_MON_STATUS : reports
+ESP32 --> UC_FAULT : detects
+ESP32 --> UC_LIMITS : enforces
+
+' Motor relationships
+Motor --> UC_MON_POS : reports position
+Motor --> UC_MON_STATUS : reports status
+Motor --> UC_FAULT : signals faults
+
+' Precondition relationships
+UC_POSITION ..> UC_ENABLE : <<precondition>>
+UC_RELATIVE ..> UC_ENABLE : <<precondition>>
+UC_HOME ..> UC_ENABLE : <<precondition>>
+UC_SPEED ..> UC_ENABLE : <<precondition>>
+UC_JOG ..> UC_ENABLE : <<precondition>>
+
+' Extension relationships
+UC_STOP ..> UC_EMERGENCY : <<extend>>
+UC_FAULT ..> UC_EMERGENCY : <<extend>>
+
+note right of UC_EMERGENCY
+  Emergency stop can be
+  triggered at any time
+  regardless of current
+  motor state
+end note
+
+note right of UC_FAULT
+  Fault detection runs
+  continuously when
+  motor is enabled
+end note
+
+@enduml 

@@ -1,0 +1,84 @@
+@startuml Motor_Subsystem_Classes
+!include ../shared_components/common_styles.puml
+
+title ESP32 Stepper Motor Controller - Motor Subsystem
+
+package "Stepper Motor Component" as StepperPkg {
+    
+    ' Core motor data structure
+    class stepper_motor_t {
+        ' Hardware Configuration
+        + gpio_num_t ain1_pin, ain2_pin
+        + gpio_num_t bin1_pin, bin2_pin
+        + gpio_num_t sleep_pin, fault_pin
+        
+        ' Runtime State
+        + int16_t current_position
+        + int16_t target_position
+        + uint16_t speed_delay_ms
+        + int16_t max_position, min_position
+        + uint8_t current_step
+        + bool is_moving, direction
+    }
+    
+    ' Command message for queue
+    class motor_cmd_msg_t <<Internal>> {
+        + motor_command_t command
+        + int16_t parameter
+    }
+    
+    ' Static API functions
+    class StepperMotorAPI <<Static API>> {
+        ' Initialization
+        + {static} esp_err_t stepper_motor_init(stepper_motor_t*)
+        
+        ' Movement Control
+        + {static} esp_err_t stepper_motor_move_to_position(stepper_motor_t*, int16_t)
+        + {static} esp_err_t stepper_motor_move_relative(stepper_motor_t*, int16_t)
+        + {static} esp_err_t stepper_motor_home(stepper_motor_t*)
+        + {static} esp_err_t stepper_motor_stop(stepper_motor_t*)
+        
+        ' Configuration
+        + {static} esp_err_t stepper_motor_set_speed(stepper_motor_t*, uint16_t)
+        + {static} esp_err_t stepper_motor_enable(stepper_motor_t*)
+        + {static} esp_err_t stepper_motor_disable(stepper_motor_t*)
+        
+        ' Status & Monitoring
+        + {static} motor_status_t stepper_motor_get_status(stepper_motor_t*)
+        + {static} int16_t stepper_motor_get_position(stepper_motor_t*)
+        + {static} bool stepper_motor_is_fault(stepper_motor_t*)
+        
+        ' Task Management
+        + {static} void stepper_motor_task(void*)
+    }
+    
+    ' Internal step control
+    class StepController <<Internal>> {
+        - {static} const uint8_t step_sequence[4][4]
+        - {static} stepper_motor_t* g_motor
+        - {static} TaskHandle_t motor_task_handle
+        - {static} QueueHandle_t motor_command_queue
+        
+        + {static} void set_motor_step(stepper_motor_t*, uint8_t)
+        + {static} void motor_stop_pins(stepper_motor_t*)
+        + {static} void execute_movement(stepper_motor_t*)
+    }
+}
+
+!includesub ../shared_components/common_components.puml!MOTOR_COMMAND_ENUM
+!includesub ../shared_components/common_components.puml!MOTOR_STATUS_ENUM
+!includesub ../shared_components/common_components.puml!MOTOR_CONFIG
+
+' Relationships
+StepperMotorAPI --> stepper_motor_t : operates on
+StepperMotorAPI --> motor_command_t : uses
+StepperMotorAPI --> motor_status_t : returns
+motor_cmd_msg_t --> motor_command_t : contains
+StepController --> stepper_motor_t : controls
+stepper_motor_t --> MotorConfig : configured by
+
+note right of stepper_motor_t : Core data structure\nContains all motor state\nThread-safe access
+
+note right of motor_cmd_msg_t : Queue message format\nAsynchronous communication\nThread-safe command passing
+
+@enduml 

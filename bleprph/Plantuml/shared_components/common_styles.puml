@@ -1,0 +1,84 @@
+!theme plain
+
+' Common styling for all ESP32 Stepper Motor Controller diagrams
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 11
+
+' Actor styling
+skinparam actor {
+  backgroundColor #E3F2FD
+  borderColor #1976D2
+  fontColor #0D47A1
+}
+
+' Use case styling
+skinparam usecase {
+  backgroundColor #FFFFFF
+  borderColor #424242
+  fontSize 11
+}
+
+' Package styling
+skinparam package {
+  backgroundColor #F5F5F5
+  borderColor #757575
+  fontStyle bold
+}
+
+' Class styling
+skinparam class {
+  backgroundColor #FFFFFF
+  borderColor #424242
+  headerBackgroundColor #E8F5E8
+}
+
+' Component styling
+skinparam component {
+  backgroundColor #E8F4FD
+  borderColor #1976D2
+}
+
+' State styling
+skinparam state {
+  backgroundColor #FFF3E0
+  borderColor #F57C00
+  fontColor #E65100
+}
+
+' Activity styling
+skinparam activity {
+  backgroundColor #F3E5F5
+  borderColor #7B1FA2
+  fontColor #4A148C
+}
+
+' Note styling
+skinparam note {
+  backgroundColor #FFFDE7
+  borderColor #F9A825
+}
+
+' Arrow styling
+skinparam arrow {
+  color #424242
+  thickness 2
+}
+
+' Sequence styling
+skinparam sequence {
+  participantBackgroundColor #E3F2FD
+  participantBorderColor #1976D2
+  actorBackgroundColor #E8F5E8
+  actorBorderColor #388E3C
+  lifeline {
+    backgroundColor #F5F5F5
+    borderColor #757575
+  }
+}
+
+' Common definitions
+!define COMPONENT_COLOR #E8F4FD
+!define API_COLOR #E1F5FE
+!define CONFIG_COLOR #F3E5F5
+!define HARDWARE_COLOR #FFEBEE 

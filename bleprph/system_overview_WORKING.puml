@@ -1,0 +1,83 @@
+@startuml ESP32_System_Use_Cases_Overview
+!theme plain
+
+skinparam backgroundColor #FAFAFA
+skinparam usecase {
+  backgroundColor #E8F5E8
+  borderColor #4CAF50
+}
+skinparam actor {
+  backgroundColor #FFF3E0
+  borderColor #FF9800
+}
+
+title ESP32 Stepper Motor Controller - System Overview
+
+left to right direction
+
+actor "Mobile User" as User
+actor "ESP32 System" as ESP32
+actor "Stepper Motor" as Motor
+actor "LED Indicators" as LEDs
+
+package "Core System Functions" {
+  usecase "Initialize System" as UC1
+  usecase "Connect via BLE" as UC2
+  usecase "Control Motor" as UC3
+  usecase "Monitor Status" as UC4
+  usecase "Handle Errors" as UC5
+}
+
+package "Motor Operations" {
+  usecase "Move to Position" as UC6
+  usecase "Move Relative" as UC7
+  usecase "Home Motor" as UC8
+  usecase "Set Speed" as UC9
+  usecase "Enable/Disable" as UC10
+}
+
+package "System Monitoring" {
+  usecase "Check Fault Status" as UC11
+  usecase "Update Position" as UC12
+  usecase "Send Notifications" as UC13
+  usecase "Control LEDs" as UC14
+}
+
+' User interactions
+User --> UC2 : Connect to ESP32
+User --> UC3 : Send motor commands
+User --> UC4 : Monitor system status
+
+' ESP32 system functions
+ESP32 --> UC1 : Boot sequence
+ESP32 --> UC5 : Error handling
+ESP32 --> UC11 : Fault detection
+ESP32 --> UC13 : BLE notifications
+ESP32 --> UC14 : Visual feedback
+
+' Motor interactions
+Motor --> UC6 : Position control
+Motor --> UC7 : Relative movement
+Motor --> UC8 : Homing operation
+Motor --> UC9 : Speed adjustment
+Motor --> UC10 : Enable/disable
+Motor --> UC12 : Position feedback
+
+' LED interactions
+LEDs --> UC14 : Status indication
+LEDs --> UC5 : Error signaling
+
+' System relationships
+UC3 .> UC6 : includes
+UC3 .> UC7 : includes
+UC3 .> UC8 : includes
+UC3 .> UC9 : includes
+UC3 .> UC10 : includes
+
+UC4 .> UC11 : includes
+UC4 .> UC12 : includes
+UC4 .> UC13 : includes
+
+note bottom : ESP32 Stepper Motor BLE Controller\nCore use cases for system operation
+
+@enduml 

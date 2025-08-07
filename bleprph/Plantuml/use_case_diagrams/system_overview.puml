@@ -1,0 +1,64 @@
+@startuml ESP32_System_Use_Cases_Overview
+!include ../shared_components/common_styles.puml
+
+title ESP32 Stepper Motor Controller - System Use Cases Overview
+
+!includesub ../shared_components/common_components.puml!COMMON_ACTORS
+
+' System boundary
+rectangle "ESP32 BLE Controller System" {
+  
+  package "Connection Management" {
+    usecase "Scan for Devices" as UC1
+    usecase "Connect to ESP32" as UC2
+    usecase "Disconnect Device" as UC3
+    usecase "Monitor Connection Status" as UC4
+    usecase "Handle Connection Errors" as UC5
+  }
+  
+  package "Device Control" {
+    usecase "LED Control" as UC_LED
+    usecase "Motor Control" as UC_MOTOR
+    usecase "System Monitoring" as UC_MONITOR
+  }
+  
+  package "System Management" {
+    usecase "Initialize System" as UC24
+    usecase "Handle Permissions" as UC25
+    usecase "Process BLE Commands" as UC26
+    usecase "Send Status Updates" as UC27
+  }
+}
+
+' High-level relationships
+User --> UC1 : initiates
+User --> UC2 : requests
+User --> UC3 : requests
+User --> UC4 : views
+User --> UC_LED : controls
+User --> UC_MOTOR : operates
+User --> UC_MONITOR : monitors
+
+ESP32 --> UC2 : advertises
+ESP32 --> UC4 : reports
+ESP32 --> UC5 : handles
+ESP32 --> UC24 : performs
+ESP32 --> UC25 : requests
+ESP32 --> UC26 : processes
+ESP32 --> UC27 : sends
+
+Motor --> UC_MONITOR : reports status
+LEDs --> UC_LED : provide feedback
+
+' Include relationships
+UC2 ..> UC1 : <<include>>
+UC2 ..> UC25 : <<include>>
+UC26 ..> UC27 : <<include>>
+
+note right of UC2
+  Requires Bluetooth and
+  Location permissions
+  on mobile device
+end note
+
+@enduml 

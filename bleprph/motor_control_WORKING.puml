@@ -1,0 +1,74 @@
+@startuml Motor_Control_Flow
+!theme plain
+
+skinparam backgroundColor #FAFAFA
+skinparam activity {
+  backgroundColor #F3E5F5
+  borderColor #7B1FA2
+}
+
+title Motor Control Task Flow - ESP32 Implementation
+
+|Motor Control Task|
+start
+
+:Wait for command from queue;
+:xQueueReceive(motor_command_queue, &cmd, 10ms);
+
+if (Command received?) then (yes)
+    |Command Processing|
+    switch (cmd.command)
+    case (MOTOR_CMD_MOVE_ABSOLUTE)
+        :target_position = cmd.parameter;
+        :stepper_motor_move_to_position(motor, target_position);
+        
+    case (MOTOR_CMD_MOVE_RELATIVE)
+        :relative_steps = cmd.parameter;
+        :stepper_motor_move_relative(motor, relative_steps);
+        
+    case (MOTOR_CMD_HOME)
+        :stepper_motor_home(motor);
+        :motor->current_position = 0;
+        
+    case (MOTOR_CMD_STOP)
+        :stepper_motor_stop(motor);
+        :motor->is_moving = false;
+        
+    case (MOTOR_CMD_SET_SPEED)
+        :new_speed = cmd.parameter;
+        :stepper_motor_set_speed(motor, new_speed);
+        
+    case (MOTOR_CMD_ENABLE)
+        :stepper_motor_enable(motor);
+        :gpio_set_level(SLEEP_PIN, 1);
+        
+    case (MOTOR_CMD_DISABLE)
+        :stepper_motor_disable(motor);
+        :gpio_set_level(SLEEP_PIN, 0);
+        
+    endswitch
+    
+    |Error Checking|
+    :Check fault pin status;
+    if (gpio_get_level(FAULT_PIN) == 0?) then (yes)
+        :ESP_LOGE("Motor fault detected");
+        :motor->fault_detected = true;
+        :stepper_motor_stop(motor);
+    endif
+    
+else (no)
+    :10ms timeout - no command;
+endif
+
+|Periodic Tasks|
+:Update motor status;
+:Check movement completion;
+:Send BLE notifications if needed;
+
+:vTaskDelay(1ms);
+
+note right : Motor Task Loop:\n• Command queue processing\n• GPIO fault monitoring\n• Position tracking\n• BLE status updates
+
+repeat
+
+@enduml 

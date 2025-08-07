@@ -1,0 +1,69 @@
+@startuml LED_Control_Use_Cases
+!include ../shared_components/common_styles.puml
+
+title ESP32 Stepper Motor Controller - LED Control Use Cases
+
+!includesub ../shared_components/common_components.puml!COMMON_ACTORS
+
+' System boundary
+rectangle "LED Control Subsystem" {
+  
+  package "Individual LED Control" {
+    usecase "Toggle LED1" as UC_LED1
+    usecase "Toggle LED2" as UC_LED2
+    usecase "Toggle LED3" as UC_LED3
+    usecase "Toggle LED4" as UC_LED4
+  }
+  
+  package "Group LED Control" {
+    usecase "Turn All LEDs On" as UC_ALL_ON
+    usecase "Turn All LEDs Off" as UC_ALL_OFF
+    usecase "Run LED Test Sequence" as UC_LED_TEST
+  }
+  
+  package "LED Status" {
+    usecase "Read LED Status" as UC_LED_STATUS
+    usecase "LED Activity Indicators" as UC_LED_ACTIVITY
+  }
+}
+
+' User relationships
+User --> UC_LED1 : controls
+User --> UC_LED2 : controls
+User --> UC_LED3 : controls
+User --> UC_LED4 : controls
+User --> UC_ALL_ON : executes
+User --> UC_ALL_OFF : executes
+User --> UC_LED_TEST : runs
+User --> UC_LED_STATUS : reads
+
+' System relationships
+ESP32 --> UC_LED_STATUS : provides
+ESP32 --> UC_LED_ACTIVITY : manages
+
+' LED hardware relationships
+LEDs --> UC_LED_STATUS : report state
+LEDs --> UC_LED_ACTIVITY : provide feedback
+
+' Dependencies
+UC_ALL_ON ..> UC_LED1 : <<include>>
+UC_ALL_ON ..> UC_LED2 : <<include>>
+UC_ALL_ON ..> UC_LED3 : <<include>>
+UC_ALL_ON ..> UC_LED4 : <<include>>
+
+UC_ALL_OFF ..> UC_LED1 : <<include>>
+UC_ALL_OFF ..> UC_LED2 : <<include>>
+UC_ALL_OFF ..> UC_LED3 : <<include>>
+UC_ALL_OFF ..> UC_LED4 : <<include>>
+
+UC_LED_TEST ..> UC_ALL_ON : <<include>>
+UC_LED_TEST ..> UC_ALL_OFF : <<include>>
+
+note right of UC_LED_ACTIVITY
+  LED1: Motor activity
+  LED2: Enable status
+  LED3: Home command
+  LED4: Stop command
+end note
+
+@enduml 

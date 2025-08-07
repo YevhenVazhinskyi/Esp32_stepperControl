@@ -1,0 +1,54 @@
+@startuml Motor_State_Machine
+!include ../shared_components/common_styles.puml
+
+title ESP32 Stepper Motor Controller - Motor State Machine
+
+state "Motor Controller" as MotorLevel {
+    
+    state DISABLED as "MOTOR_DISABLED" {
+        DISABLED : • Sleep pin LOW
+        DISABLED : • All control pins LOW
+        DISABLED : • No power consumption
+        DISABLED : • No operation allowed
+    }
+    
+    state IDLE as "MOTOR_IDLE" {
+        IDLE : • Sleep pin HIGH
+        IDLE : • Driver enabled
+        IDLE : • Monitoring faults
+        IDLE : • Queue ready
+        IDLE : • Position holding
+    }
+    
+    state MOVING as "MOTOR_MOVING" {
+        MOVING : • Step generation active
+        MOVING : • Position tracking
+        MOVING : • Speed control
+        MOVING : • Continuous fault check
+        MOVING : • Target seeking
+    }
+    
+    state FAULT as "MOTOR_FAULT" {
+        FAULT : • Hardware fault detected
+        FAULT : • Movement stopped
+        FAULT : • Error reporting
+        FAULT : • Recovery wait
+        FAULT : • Diagnostic mode
+    }
+    
+    [*] --> DISABLED
+    DISABLED --> IDLE : MOTOR_CMD_ENABLE
+    IDLE --> DISABLED : MOTOR_CMD_DISABLE
+    IDLE --> MOVING : Movement command
+    IDLE --> FAULT : Fault detected
+    MOVING --> IDLE : Target reached
+    MOVING --> IDLE : MOTOR_CMD_STOP
+    MOVING --> FAULT : Fault detected
+    FAULT --> IDLE : Fault cleared
+    
+    note right of MOVING : Movement Commands:\n• MOVE_ABSOLUTE\n• MOVE_RELATIVE\n• HOME\n• JOG
+    
+    note right of FAULT : Fault Sources:\n• DRV8833 FAULT pin\n• Overcurrent\n• Overtemperature\n• Short circuit
+}
+
+@enduml 

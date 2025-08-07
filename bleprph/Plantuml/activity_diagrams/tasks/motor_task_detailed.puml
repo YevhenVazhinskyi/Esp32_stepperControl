@@ -1,0 +1,112 @@
+@startuml Motor_Task_Detailed_Flow
+!include ../../shared_components/common_styles.puml
+
+title Motor Control Task - Command Processing and Movement Execution
+
+|Motor Task (Priority 5)|
+start
+:stepper_motor_task() started;
+:Initialize motor_cmd_msg_t cmd;
+:ESP_LOGI("Motor control task started");
+
+repeat
+    |Command Queue Processing|
+    :xQueueReceive(motor_command_queue, &cmd, 10ms);
+    if (Command received?) then (yes)
+        switch (cmd.command)
+        
+        case (MOTOR_CMD_STOP)
+            :motor->is_moving = false;
+            :motor_stop_pins(motor);
+            :ESP_LOGI("Motor stopped");
+            
+        case (MOTOR_CMD_MOVE_ABSOLUTE)
+            :motor->target_position = cmd.parameter;
+            :motor->is_moving = true;
+            :ESP_LOGI("Moving to position: %d", cmd.parameter);
+            
+        case (MOTOR_CMD_MOVE_RELATIVE)
+            :Calculate new target = current + parameter;
+            |Position Limit Checking|
+            if (target > max_position?) then (yes)
+                :target = max_position;
+            endif
+            if (target < min_position?) then (yes)
+                :target = min_position;
+            endif
+            :motor->target_position = target;
+            :motor->is_moving = true;
+            :ESP_LOGI("Moving relative: %d steps, target: %d");
+            
+        case (MOTOR_CMD_HOME)
+            :motor->target_position = 0;
+            :motor->is_moving = true;
+            :ESP_LOGI("Homing motor");
+            
+        case (MOTOR_CMD_SET_SPEED)
+            :motor->speed_delay_ms = cmd.parameter;
+            :ESP_LOGI("Speed set to: %d ms", cmd.parameter);
+            
+        case (MOTOR_CMD_ENABLE)
+            :stepper_motor_enable(motor);
+            :ESP_LOGI("Motor enabled");
+            
+        case (MOTOR_CMD_DISABLE)
+            :stepper_motor_disable(motor);
+            :ESP_LOGI("Motor disabled");
+            
+        case (default)
+            :ESP_LOGW("Unknown command: %d", cmd.command);
+            
+        endswitch
+    endif
+    
+    |Hardware Fault Detection|
+    :Read fault pin: gpio_get_level(motor->fault_pin);
+    if (Fault pin LOW?) then (yes)
+        :ESP_LOGE("Motor fault detected!");
+        :motor->is_moving = false;
+        :motor_stop_pins(motor);
+        :vTaskDelay(1000ms);
+        :Continue to next cycle;
+    endif
+    
+    |Movement Execution Engine|
+    if (motor->is_moving AND current != target?) then (yes)
+        |Step Calculation|
+        :Determine direction = (target > current);
+        :Select step pattern from step_sequence[current_step];
+        
+        |GPIO Control|
+        :gpio_set_level(ain1_pin, pattern[0]);
+        :gpio_set_level(ain2_pin, pattern[1]);
+        :gpio_set_level(bin1_pin, pattern[2]);
+        :gpio_set_level(bin2_pin, pattern[3]);
+        
+        |Position Tracking|
+        if (direction == forward?) then (yes)
+            :current_position++;
+            :current_step = (current_step + 1) % 4;
+        else (no)
+            :current_position--;
+            :current_step = (current_step + 3) % 4;
+        endif
+        
+        |Speed Control|
+        :vTaskDelay(speed_delay_ms);
+        
+        |Target Check|
+        if (current_position == target_position?) then (yes)
+            :motor->is_moving = false;
+            :motor_stop_pins(motor);
+            :ESP_LOGI("Target reached: %d", current_position);
+        endif
+    endif
+    
+repeat while (Task active)
+
+note right : Task Details:\n• Stack: 4096 bytes\n• Core: CPU Core 1\n• Queue: 10 message capacity\n• Queue Timeout: 10ms\n• Step Sequence: 4-phase full step
+
+stop
+
+@enduml 

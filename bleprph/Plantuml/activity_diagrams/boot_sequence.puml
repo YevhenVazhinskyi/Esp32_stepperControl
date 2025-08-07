@@ -1,0 +1,60 @@
+@startuml ESP32_Boot_Sequence
+!theme plain
+
+skinparam backgroundColor #FAFAFA
+skinparam activity {
+  backgroundColor #F3E5F5
+  borderColor #7B1FA2
+}
+
+title ESP32 System Boot Sequence
+
+|Hardware|
+start
+:Power-on Reset;
+:ESP32 ROM Boot;
+:Load Bootloader;
+
+|Bootloader|
+:Initialize hardware;
+:Load application;
+:Jump to app_main();
+
+|FreeRTOS|
+:Start scheduler;
+:Initialize heap;
+:Create idle task;
+
+|Application|
+:app_main() entry;
+
+|NVS|
+:nvs_flash_init();
+if (NVS OK?) then (yes)
+    :NVS ready;
+else (no)
+    :nvs_flash_erase();
+    :retry init;
+    :NVS ready;
+endif
+
+|Motor|
+:Configure GPIO;
+:Initialize motor;
+:Create motor task;
+:Create command queue;
+
+|BLE|
+:nimble_port_init();
+:Configure services;
+:Register callbacks;
+:Start advertising;
+
+|System|
+:system_status = READY;
+:Create main task;
+:System operational;
+
+stop
+
+@enduml 

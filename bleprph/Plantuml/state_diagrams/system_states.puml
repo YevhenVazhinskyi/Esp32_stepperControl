@@ -1,0 +1,53 @@
+@startuml System_State_Machine
+!include ../shared_components/common_styles.puml
+
+title ESP32 Stepper Motor Controller - System State Machine
+
+state "System Controller" as SystemLevel {
+    
+    state INIT as "SYSTEM_INIT" {
+        INIT : • Initialize NVS Flash
+        INIT : • Setup motor hardware
+        INIT : • Initialize BLE stack
+        INIT : • Create tasks
+        INIT : • Configure GPIO
+    }
+    
+    state READY as "SYSTEM_READY" {
+        READY : • Monitor faults
+        READY : • Log status (10s cycle)
+        READY : • Process events
+        READY : • Handle commands
+        READY : • Full operational mode
+    }
+    
+    state ERROR as "SYSTEM_ERROR" {
+        ERROR : • Error recovery
+        ERROR : • Fault handling
+        ERROR : • Wait & retry (5s cycle)
+        ERROR : • Limited functionality
+        ERROR : • Automatic recovery attempt
+    }
+    
+    state TESTING as "SYSTEM_TESTING" {
+        TESTING : • Run test suite
+        TESTING : • Validate hardware
+        TESTING : • Test motor movements
+        TESTING : • Report results
+        TESTING : • Block normal operation
+    }
+    
+    [*] --> INIT
+    INIT --> READY : All components OK
+    INIT --> ERROR : Initialization failed
+    READY --> ERROR : Motor fault detected
+    READY --> TESTING : CONFIG_ENABLE_MOTOR_TESTS
+    ERROR --> READY : Fault cleared
+    TESTING --> READY : Tests complete
+    
+    note right of READY : Main operational state\nHandles all user commands\nContinuous monitoring
+    
+    note right of ERROR : Automatic recovery:\n1. Wait 5 seconds\n2. Check fault status\n3. Retry if cleared\n4. Max 3 attempts
+}
+
+@enduml 

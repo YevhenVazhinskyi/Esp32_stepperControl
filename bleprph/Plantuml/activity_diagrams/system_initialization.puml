@@ -1,0 +1,76 @@
+@startuml System_Initialization_Flow
+!theme plain
+
+' Inline styling to avoid path issues
+skinparam backgroundColor #FAFAFA
+skinparam activity {
+  backgroundColor #F3E5F5
+  borderColor #7B1FA2
+  fontColor #4A148C
+}
+
+title ESP32 Stepper Motor Controller - System Initialization
+
+|System Startup|
+start
+:Power On / Reset;
+
+|NVS Initialization|
+:Initialize NVS Flash;
+if (NVS OK?) then (yes)
+    :NVS ready;
+else (no)
+    :Erase NVS;
+    :Retry initialization;
+    if (Retry OK?) then (yes)
+        :NVS ready;
+    else (no)
+        :Fatal NVS error;
+        stop
+    endif
+endif
+
+|Motor Initialization|
+:Configure GPIO pins;
+:Set initial motor state;
+:Create motor task;
+:Create command queue;
+if (Motor init OK?) then (yes)
+    :Motor ready;
+else (no)
+    :Motor initialization failed;
+    stop
+endif
+
+|BLE Initialization|
+:Initialize NimBLE stack;
+:Configure BLE services;
+:Register GATT callbacks;
+:Set motor reference;
+:Start advertising;
+if (BLE init OK?) then (yes)
+    :BLE ready;
+else (no)
+    :BLE initialization failed;
+    stop
+endif
+
+|Task Creation|
+:Create main application task;
+:system_status = READY;
+
+|Optional Testing|
+if (CONFIG_ENABLE_MOTOR_TESTS?) then (yes)
+    :system_status = TESTING;
+    :Run motor test suite;
+    :system_status = READY;
+endif
+
+:System operational;
+:Begin main loop;
+
+note right : Initialization Order:\n1. NVS (Non-Volatile Storage)\n2. Motor Hardware\n3. BLE Stack\n4. Main Application Task\n5. Optional Tests
+
+stop
+
+@enduml 

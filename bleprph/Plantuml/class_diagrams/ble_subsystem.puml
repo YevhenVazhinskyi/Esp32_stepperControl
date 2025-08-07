@@ -1,0 +1,82 @@
+@startuml BLE_Subsystem_Classes
+!include ../shared_components/common_styles.puml
+
+title ESP32 Stepper Motor Controller - BLE Subsystem
+
+package "BLE Peripheral Component" as BLEPkg {
+    
+    ' BLE Peripheral management
+    class BLEPeripheralAPI <<Static API>> {
+        + {static} esp_err_t ble_peripheral_init()
+        + {static} esp_err_t ble_peripheral_start_advertising()
+        + {static} esp_err_t ble_peripheral_stop_advertising()
+        + {static} bool ble_peripheral_is_connected()
+        + {static} uint16_t ble_peripheral_get_conn_handle()
+    }
+    
+    ' GATT Server management
+    class GATTServerAPI <<Static API>> {
+        + {static} esp_err_t gatt_svr_init()
+        + {static} void gatt_svr_set_motor(void*)
+        + {static} void gatt_svr_register_cb(ble_gatt_register_ctxt*, void*)
+    }
+    
+    ' BLE Runtime State
+    class BLEState <<Internal>> {
+        - uint16_t conn_handle
+        - bool is_connected
+        - uint8_t ble_addr_type
+        - uint8_t led_states[4]
+        - uint16_t led_handles[4]
+        - uint16_t motor_handles[4]
+        - stepper_motor_t* g_motor
+    }
+    
+    ' Service definitions
+    class LEDService <<Service>> {
+        - ble_uuid128_t service_uuid
+        - ble_uuid128_t char_uuids[4]
+        - uint16_t char_handles[4]
+        
+        + int led_svc_access(uint16_t, uint16_t, ble_gatt_access_ctxt*, void*)
+        + void led_control(int, uint8_t)
+    }
+    
+    class MotorService <<Service>> {
+        - ble_uuid128_t service_uuid
+        - ble_uuid128_t position_char_uuid
+        - ble_uuid128_t command_char_uuid
+        - ble_uuid128_t status_char_uuid
+        - ble_uuid128_t speed_char_uuid
+        
+        + int motor_svc_access(uint16_t, uint16_t, ble_gatt_access_ctxt*, void*)
+        + void process_motor_command(uint8_t, int16_t)
+    }
+    
+    ' Hardware GPIO control
+    class LEDController <<Internal>> {
+        - const gpio_num_t led_gpios[4]
+        
+        + esp_err_t led_gpio_init()
+        + void flash_led(int, int)
+        + void set_led_state(int, uint8_t)
+    }
+}
+
+!includesub ../shared_components/common_components.puml!SYSTEM_CONFIG
+
+' Relationships
+BLEPeripheralAPI --> BLEState : manages
+BLEPeripheralAPI --> GATTServerAPI : initializes
+GATTServerAPI --> LEDService : registers
+GATTServerAPI --> MotorService : registers
+BLEState --> stepper_motor_t : references
+MotorService --> stepper_motor_t : controls
+LEDService --> LEDController : uses
+BLEPeripheralAPI --> SystemConfig : uses
+
+note right of BLEState : Runtime state management\nConnection tracking\nHandle management\nDirect motor reference
+
+note right of MotorService : Motor control via BLE\nDirect stepper motor API calls\nCommand processing\nStatus reporting
+
+@enduml 

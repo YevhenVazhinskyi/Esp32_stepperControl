@@ -1,0 +1,156 @@
+@startuml ESP32_Stepper_Motor_Use_Cases
+
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam actor {
+  backgroundColor #E3F2FD
+  borderColor #1976D2
+}
+skinparam usecase {
+  backgroundColor #FFFFFF
+  borderColor #424242
+  fontSize 11
+}
+skinparam package {
+  backgroundColor #F5F5F5
+  borderColor #757575
+}
+
+title ESP32 Stepper Motor BLE Controller - Use Cases
+
+' Actors
+actor "Mobile User" as User
+actor "ESP32 Device" as ESP32
+actor "Stepper Motor" as Motor
+actor "LEDs" as LEDs
+
+' System boundary
+rectangle "ESP32 BLE Controller System" {
+  
+  package "Connection Management" {
+    usecase "Scan for Devices" as UC1
+    usecase "Connect to ESP32" as UC2
+    usecase "Disconnect Device" as UC3
+    usecase "Monitor Connection Status" as UC4
+    usecase "Handle Connection Errors" as UC5
+  }
+  
+  package "LED Control" {
+    usecase "Toggle Individual LED" as UC6
+    usecase "Turn All LEDs On" as UC7
+    usecase "Turn All LEDs Off" as UC8
+    usecase "Run LED Test Sequence" as UC9
+    usecase "Read LED Status" as UC10
+  }
+  
+  package "Motor Control" {
+    usecase "Enable Motor" as UC11
+    usecase "Disable Motor" as UC12
+    usecase "Set Motor Position" as UC13
+    usecase "Move Motor Relative" as UC14
+    usecase "Home Motor" as UC15
+    usecase "Stop Motor" as UC16
+    usecase "Set Motor Speed" as UC17
+    usecase "Jog Motor" as UC18
+  }
+  
+  package "Monitoring & Status" {
+    usecase "Monitor Motor Position" as UC19
+    usecase "Monitor Motor Status" as UC20
+    usecase "Detect Motor Faults" as UC21
+    usecase "View Command History" as UC22
+    usecase "Emergency Stop" as UC23
+  }
+  
+  package "System Management" {
+    usecase "Initialize System" as UC24
+    usecase "Handle Permissions" as UC25
+    usecase "Process BLE Commands" as UC26
+    usecase "Send Status Updates" as UC27
+  }
+}
+
+' User relationships
+User --> UC1 : initiates
+User --> UC2 : requests
+User --> UC3 : requests
+User --> UC4 : views
+User --> UC6 : controls
+User --> UC7 : executes
+User --> UC8 : executes
+User --> UC9 : runs
+User --> UC11 : enables
+User --> UC12 : disables
+User --> UC13 : sets
+User --> UC14 : moves
+User --> UC15 : homes
+User --> UC16 : stops
+User --> UC17 : adjusts
+User --> UC18 : jogs
+User --> UC19 : monitors
+User --> UC20 : monitors
+User --> UC22 : views
+User --> UC23 : triggers
+
+' ESP32 relationships
+ESP32 --> UC2 : advertises
+ESP32 --> UC4 : reports
+ESP32 --> UC5 : handles
+ESP32 --> UC10 : provides
+ESP32 --> UC19 : reports
+ESP32 --> UC20 : reports
+ESP32 --> UC21 : detects
+ESP32 --> UC24 : performs
+ESP32 --> UC25 : requests
+ESP32 --> UC26 : processes
+ESP32 --> UC27 : sends
+
+' Motor relationships
+Motor --> UC19 : reports position
+Motor --> UC20 : reports status
+Motor --> UC21 : signals faults
+
+' LED relationships
+LEDs --> UC10 : provide status
+
+' Dependencies and includes
+UC2 ..> UC1 : <<include>>
+UC2 ..> UC25 : <<include>>
+UC6 ..> UC2 : <<precondition>>
+UC7 ..> UC2 : <<precondition>>
+UC8 ..> UC2 : <<precondition>>
+UC9 ..> UC2 : <<precondition>>
+UC11 ..> UC2 : <<precondition>>
+UC12 ..> UC2 : <<precondition>>
+UC13 ..> UC11 : <<precondition>>
+UC14 ..> UC11 : <<precondition>>
+UC15 ..> UC11 : <<precondition>>
+UC17 ..> UC11 : <<precondition>>
+UC18 ..> UC11 : <<precondition>>
+UC16 ..> UC23 : <<extend>>
+UC21 ..> UC23 : <<extend>>
+
+' System boundaries
+UC24 ..> UC25 : <<include>>
+UC26 ..> UC27 : <<include>>
+
+note right of UC23
+  Emergency stop can be
+  triggered at any time
+  regardless of current
+  motor state
+end note
+
+note right of UC21
+  Fault detection runs
+  continuously when
+  motor is enabled
+end note
+
+note bottom of UC2
+  Requires Bluetooth and
+  Location permissions
+  on mobile device
+end note
+
+@enduml 

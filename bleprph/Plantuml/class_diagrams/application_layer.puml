@@ -1,0 +1,60 @@
+@startuml Application_Layer_Classes
+!include ../shared_components/common_styles.puml
+
+title ESP32 Stepper Motor Controller - Application Layer
+
+package "Application Layer" as AppLayer {
+    class MainApplication {
+        ' System State
+        - system_status_t system_status
+        - stepper_motor_t g_motor
+        
+        ' Initialization Functions
+        + esp_err_t init_nvs()
+        + esp_err_t init_motor()
+        + esp_err_t init_ble()
+        
+        ' Runtime Functions
+        + void app_main_task(void*)
+        + void app_main()
+        
+        ' Testing Functions
+        + void run_motor_tests()
+    }
+    
+    class SystemMonitor {
+        - static int log_counter
+        - TickType_t last_check_time
+        
+        + void monitor_system_status()
+        + void check_motor_faults()
+        + void log_periodic_status()
+        + void handle_error_recovery()
+    }
+    
+    class TaskManager {
+        - TaskHandle_t main_task_handle
+        - TaskHandle_t motor_task_handle
+        - QueueHandle_t motor_command_queue
+        
+        + esp_err_t create_main_task()
+        + esp_err_t create_motor_task()
+        + void task_cleanup()
+    }
+}
+
+!includesub ../shared_components/common_components.puml!SYSTEM_STATUS_ENUM
+
+' Relationships
+MainApplication *-- SystemMonitor : contains
+MainApplication *-- TaskManager : contains
+MainApplication --> system_status_t : uses
+
+SystemMonitor --> system_status_t : monitors
+TaskManager --> system_status_t : reports
+
+note right of MainApplication : Entry point for ESP32 application\nManages system lifecycle\nCoordinates all components
+
+note right of SystemMonitor : Runs in main task loop\n100ms cycle time\nAutomatic error recovery
+
+@enduml 

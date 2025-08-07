@@ -1,0 +1,52 @@
+@startuml BLE_State_Machine
+!include ../shared_components/common_styles.puml
+
+title ESP32 Stepper Motor Controller - BLE State Machine
+
+state "BLE Controller" as BLELevel {
+    
+    state INIT as "BLE_INIT" {
+        INIT : • NimBLE stack setup
+        INIT : • GATT services registration
+        INIT : • Characteristic configuration
+        INIT : • Callback setup
+        INIT : • Device name setting
+    }
+    
+    state ADVERTISING as "BLE_ADVERTISING" {
+        ADVERTISING : • Broadcast device name
+        ADVERTISING : • Wait for connection
+        ADVERTISING : • 20-40ms intervals
+        ADVERTISING : • Auto-restart on disconnect
+        ADVERTISING : • Connectable mode
+    }
+    
+    state CONNECTED as "BLE_CONNECTED" {
+        CONNECTED : • GATT server active
+        CONNECTED : • Handle client requests
+        CONNECTED : • Send notifications
+        CONNECTED : • Process characteristics
+        CONNECTED : • Maintain connection
+    }
+    
+    state DISCONNECTED as "BLE_DISCONNECTED" {
+        DISCONNECTED : • Connection cleanup
+        DISCONNECTED : • State reset
+        DISCONNECTED : • Prepare for restart
+        DISCONNECTED : • Resource cleanup
+    }
+    
+    [*] --> INIT
+    INIT --> ADVERTISING : Initialization success
+    INIT --> INIT : Initialization retry
+    ADVERTISING --> CONNECTED : Client connects
+    CONNECTED --> DISCONNECTED : Connection lost
+    CONNECTED --> DISCONNECTED : Client disconnects
+    DISCONNECTED --> ADVERTISING : Auto-restart
+    
+    note right of CONNECTED : GATT Services:\n• LED Control Service\n• Motor Control Service\n• Position Service\n• Status Service
+    
+    note right of ADVERTISING : Advertisement Data:\n• Device name\n• Service UUIDs\n• Appearance\n• Flags
+}
+
+@enduml 

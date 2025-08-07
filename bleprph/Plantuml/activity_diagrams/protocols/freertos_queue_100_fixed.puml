@@ -1,0 +1,90 @@
+@startuml FreeRTOS_Queue_Communication
+!theme plain
+
+' Inline styling
+skinparam backgroundColor #FAFAFA
+skinparam activity {
+  backgroundColor #F3E5F5
+  borderColor #7B1FA2
+  fontColor #4A148C
+}
+
+title FreeRTOS Queue-Based Inter-Task Communication
+
+|BLE Task (Producer)|
+start
+:Motor command received via BLE;
+:Create motor_cmd_msg_t structure;
+:cmd.command = MOTOR_CMD_MOVE_ABSOLUTE;
+:cmd.parameter = target_position;
+
+|Queue Send Operation|
+:xQueueSend(motor_command_queue, &cmd, timeout);
+if (Queue full?) then (yes)
+    :Queue send timeout;
+    :ESP_LOGW("Motor queue full, dropping command");
+    :Return error to BLE client;
+else (no)
+    :Command queued successfully;
+    :Return success to BLE client;
+endif
+
+|Motor Task (Consumer)|
+fork again
+    repeat
+        |Queue Receive Operation|
+        :xQueueReceive(motor_command_queue, &cmd, 10ms);
+        if (Message received?) then (yes)
+            :Process motor command;
+            switch (cmd.command)
+            case (MOTOR_CMD_MOVE_ABSOLUTE)
+                :Execute movement to cmd.parameter;
+            case (MOTOR_CMD_STOP)
+                :Stop motor immediately;
+            case (MOTOR_CMD_HOME)
+                :Move to position 0;
+            endswitch
+        else (no)
+            :10ms timeout - continue monitoring;
+        endif
+        
+        |Queue Status Monitoring|
+        :uxQueueMessagesWaiting(motor_command_queue);
+        if (Queue depth > 80%?) then (yes)
+            :ESP_LOGW("Motor queue getting full");
+        endif
+        
+    repeat while (Task active)
+end fork
+
+|Queue Health Monitoring|
+:Monitor queue high water mark;
+:Track send/receive rates;
+:Detect queue overflow conditions;
+:Log queue performance metrics;
+
+|Error Conditions|
+if (Queue creation failed?) then (yes)
+    :ESP_LOGE("Failed to create motor queue");
+    :System initialization failure;
+    stop
+endif
+
+if (Queue send timeout?) then (yes)
+    :ESP_LOGW("Queue send timeout");
+    :Possible consumer starvation;
+    :Implement backpressure;
+endif
+
+if (Queue receive timeout?) then (yes)
+    :Normal condition - no commands pending;
+    :Continue monitoring cycle;
+endif
+
+note right : Queue Configuration:\n• Capacity: 10 messages\n• Message Size: sizeof(motor_cmd_msg_t)\n• Timeout: 10ms receive, variable send\n• Type: FIFO ordering
+
+note left : Performance Characteristics:\n• Send Time: ~10μs typical\n• Receive Time: ~10μs typical\n• Context Switch: ~50μs\n• Maximum Latency: 20ms
+
+stop
+
+@enduml 

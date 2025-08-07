@@ -1,0 +1,112 @@
+@startuml BLE_Stack_Protocol_Flow
+!include ../../shared_components/common_styles.puml
+
+title BLE Protocol Stack - NimBLE Implementation
+
+|Application Layer|
+start
+:BLE command from mobile app;
+
+|GATT Layer|
+:GATT characteristic write;
+:Validate characteristic UUID;
+:Extract attribute handle;
+:Check permissions (read/write);
+
+|ATT Layer|
+:ATT (Attribute Protocol) processing;
+:Validate PDU format;
+:Check ATT MTU size;
+:Handle fragmentation if needed;
+
+|L2CAP Layer|
+:L2CAP packet processing;
+:Channel management;
+:Flow control;
+:Packet reassembly;
+
+|HCI Layer|
+:Host Controller Interface;
+:Command/Event processing;
+:Data packet routing;
+:Error handling and retries;
+
+|Link Layer (ESP32 Hardware)|
+:Radio frequency control;
+:Packet transmission/reception;
+:CRC validation;
+:Acknowledgment handling;
+
+|Physical Layer|
+:2.4GHz ISM band transmission;
+:GFSK modulation;
+:Frequency hopping;
+:Signal processing;
+
+fork
+    |Advertising Process|
+    repeat
+        :Prepare advertising packet;
+        :Set advertising data;
+        :Include device name: "ESP32_StepperMotor";
+        :Include service UUIDs;
+        :Transmit on advertising channels (37, 38, 39);
+        :Wait advertising interval (20-40ms);
+    repeat while (Not connected)
+    
+fork again
+    |Connection Process|
+    :Receive connection request;
+    :Negotiate connection parameters;
+    :Connection interval: 7.5-4000ms;
+    :Slave latency: 0-499;
+    :Supervision timeout: 100-32000ms;
+    :Establish encrypted link (optional);
+    
+    |Data Exchange|
+    repeat
+        :Process GATT requests;
+        :Handle notifications;
+        :Manage connection events;
+        :Monitor link quality;
+    repeat while (Connected)
+    
+fork again
+    |Error Handling|
+    if (Connection lost?) then (yes)
+        :Cleanup connection state;
+        :Reset GATT database;
+        :Restart advertising;
+    endif
+    
+    if (Protocol error?) then (yes)
+        :Send error response;
+        :Log error condition;
+        :Attempt recovery;
+    endif
+    
+end fork
+
+|Stack Configuration|
+partition "NimBLE Configuration" {
+    :Host stack on CPU Core 0;
+    :Controller on ESP32 hardware;
+    :Memory pool: 4KB default;
+    :Max connections: 1;
+    :Max services: 10;
+    :Max characteristics: 20;
+}
+
+|Performance Monitoring|
+:Track connection events;
+:Monitor data throughput;
+:Measure response latencies;
+:Log stack statistics;
+
+note right : BLE Specifications:\n• Version: Bluetooth 5.0\n• Role: Peripheral only\n• Security: No pairing required\n• MTU: 23 bytes default, 512 max\n• Services: LED Control, Motor Control\n• Characteristics: 8 total
+
+note left : Timing Requirements:\n• Advertising interval: 20-40ms\n• Connection interval: 7.5ms minimum\n• GATT response: <30ms\n• Service discovery: <3s\n• Connection establishment: <3s
+
+stop
+
+@enduml 

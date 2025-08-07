@@ -1,0 +1,65 @@
+@startuml System_Startup_Sequence
+!include ../shared_components/common_styles.puml
+
+title ESP32 Stepper Motor Controller - System Startup Sequence
+
+participant "System\nController" as System
+participant "NVS\nFlash" as NVS
+participant "Motor\nAPI" as Motor
+participant "BLE\nStack" as BLE
+participant "Hardware\nLayer" as Hardware
+
+== System Initialization ==
+
+System -> System : Power on / Reset
+System -> System : app_main() entry
+
+=== NVS Initialization ===
+System -> NVS : nvs_flash_init()
+alt NVS OK
+    NVS --> System : ESP_OK
+else NVS needs erase
+    NVS --> System : ESP_ERR_NVS_NO_FREE_PAGES
+    System -> NVS : nvs_flash_erase()
+    System -> NVS : nvs_flash_init() retry
+    NVS --> System : ESP_OK
+end
+
+=== Motor Initialization ===
+System -> Motor : stepper_motor_init(&g_motor)
+Motor -> Hardware : Configure GPIO pins (AIN1, AIN2, BIN1, BIN2)
+Motor -> Hardware : Configure sleep and fault pins
+Motor -> Motor : Initialize motor state
+Motor -> Motor : Create command queue (10 items)
+Motor -> Motor : Create motor task (4KB stack)
+Motor --> System : ESP_OK
+
+=== BLE Initialization ===
+System -> BLE : ble_peripheral_init()
+BLE -> BLE : nimble_port_init()
+BLE -> BLE : Configure host stack callbacks
+BLE -> BLE : Set device name and appearance
+BLE -> BLE : gatt_svr_init()
+BLE -> BLE : gatt_svr_set_motor(&g_motor)
+BLE -> BLE : Start BLE host task
+BLE -> BLE : Start advertising
+BLE --> System : ESP_OK
+
+=== Task Creation ===
+System -> System : system_status = SYSTEM_STATUS_READY
+System -> System : Create main application task
+
+opt Motor Tests Enabled
+    System -> System : system_status = SYSTEM_STATUS_TESTING
+    System -> Motor : motor_test_suite(&g_motor)
+    Motor -> Hardware : Execute test movements
+    Hardware --> Motor : Test results
+    Motor --> System : Test complete
+    System -> System : system_status = SYSTEM_STATUS_READY
+end
+
+System -> System : System operational
+
+note over System, Hardware : Initialization complete\nSystem ready for BLE connections\nMotor ready for commands
+
+@enduml 

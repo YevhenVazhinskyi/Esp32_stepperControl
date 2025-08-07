@@ -1,0 +1,73 @@
+@startuml Main_Application_Task_Loop
+!theme plain
+
+skinparam backgroundColor #FAFAFA
+skinparam activity {
+  backgroundColor #F3E5F5
+  borderColor #7B1FA2
+  fontColor #4A148C
+}
+
+title Main Application Task - System Monitoring and Control
+
+|Main Task (Priority 5)|
+start
+:Task started - app_main_task();
+:Initialize local variables;
+:log_counter = 0;
+
+repeat
+    |System State Processing|
+    switch (system_status)
+    
+    case (SYSTEM_STATUS_READY)
+        |Fault Monitoring|
+        :Check stepper_motor_is_fault(&g_motor);
+        if (Motor fault detected?) then (yes)
+            :ESP_LOGE("Motor fault detected!");
+            :system_status = SYSTEM_STATUS_ERROR;
+        else (no)
+            |Periodic Logging|
+            :log_counter++;
+            if (log_counter >= 100?) then (yes)
+                :log_counter = 0;
+                |BLE Status Check|
+                if (ble_peripheral_is_connected()) then (yes)
+                    :Log BLE connection handle;
+                else (no)
+                    :Log "BLE advertising, waiting...";
+                endif
+                |Motor Status Check|
+                :motor_status = stepper_motor_get_status(&g_motor);
+                :position = stepper_motor_get_position(&g_motor);
+                :ESP_LOGI("Motor status: %d, position: %d");
+            endif
+        endif
+        
+    case (SYSTEM_STATUS_ERROR)
+        |Error Recovery Process|
+        :ESP_LOGE("System in error state");
+        :vTaskDelay(5000ms);
+        :Check stepper_motor_is_fault(&g_motor);
+        if (Fault cleared?) then (yes)
+            :ESP_LOGI("Fault cleared, returning to ready");
+            :system_status = SYSTEM_STATUS_READY;
+        endif
+        
+    case (SYSTEM_STATUS_TESTING)
+        |Test Mode|
+        :Do nothing - tests running in separate context;
+        
+    endswitch
+    
+    |Task Scheduling|
+    :vTaskDelay(100ms);
+    note right : 100ms system monitoring cycle\nAllows other tasks to run\nPrevents watchdog timeout
+    
+repeat while (System running)
+
+note left : Task Stack: 4096 bytes\nCore: CPU Core 1\nPriority: 5 (above motor task)\nCycle Time: 100ms
+
+stop
+
+@enduml 

@@ -1,0 +1,89 @@
+@startuml BLE_Communication_Flow
+!theme plain
+
+' Inline styling
+skinparam backgroundColor #FAFAFA
+skinparam activity {
+  backgroundColor #F3E5F5
+  borderColor #7B1FA2
+  fontColor #4A148C
+}
+
+title ESP32 Stepper Motor Controller - BLE Communication Flow
+
+|BLE Stack|
+start
+:Start advertising;
+
+repeat
+    |Connection Management|
+    :Wait for client connection;
+    if (Client connects?) then (yes)
+        :Stop advertising;
+        :Establish connection;
+        
+        repeat
+            |Request Processing|
+            :Wait for GATT request;
+            if (Request received?) then (yes)
+                switch (Request type?)
+                case (LED Control)
+                    |LED Service|
+                    :Parse LED command;
+                    :Update LED state;
+                    :Control GPIO pins;
+                    :Send response;
+                    
+                case (Motor Position Read)
+                    |Motor Service|
+                    :Get current position;
+                    :Send position data;
+                    
+                case (Motor Position Write)
+                    |Motor Service|
+                    :Parse target position;
+                    :Call stepper_motor_move_to_position();
+                    :Send confirmation;
+                    
+                case (Motor Command)
+                    |Motor Service|
+                    :Parse command packet;
+                    switch (Motor command?)
+                    case (STOP)
+                        :Call stepper_motor_stop();
+                    case (HOME)
+                        :Call stepper_motor_home();
+                    case (ENABLE/DISABLE)
+                        :Call stepper_motor_enable/disable();
+                    case (SET_SPEED)
+                        :Call stepper_motor_set_speed();
+                    endswitch
+                    :Send response;
+                    
+                case (Status Request)
+                    |Status Service|
+                    :Get motor status;
+                    :Get system status;
+                    :Send status data;
+                    
+                endswitch
+            endif
+            
+        repeat while (Client connected?) is (yes)
+        
+    endif
+    
+    |Connection Cleanup|
+    :Clean up connection;
+    :Reset BLE state;
+    :Restart advertising;
+    
+repeat while (BLE enabled?) is (yes)
+
+note right : GATT Services:\n• LED Control Service\n• Motor Control Service\n• Position Service\n• Status Service
+
+note left : Response Times:\n• GATT request: <30ms\n• Connection: <3s\n• Advertising: 20-40ms intervals
+
+stop
+
+@enduml 
