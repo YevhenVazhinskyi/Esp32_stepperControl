@@ -8,7 +8,7 @@ idf_component_register(
         "."
     REQUIRES 
         nvs_flash
-        esp_log
+        log
         freertos
         stepper_motor
         ble_peripheral

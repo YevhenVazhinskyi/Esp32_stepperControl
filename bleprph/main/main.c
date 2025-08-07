@@ -44,7 +44,7 @@ static esp_err_t init_motor(void) {
     
     esp_err_t ret = stepper_motor_init(&g_motor);
     if (ret != ESP_OK) {
-     /   ESP_LOGE(TAG, "Failed to initialize motor: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to initialize motor: %s", esp_err_to_name(ret));
         return ret;
     }
     

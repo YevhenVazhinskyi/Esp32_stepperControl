@@ -7,18 +7,36 @@
 extern "C" {
 #endif
 
+/** 
+ * ⚠️⚠️⚠️ CRITICAL WARNING ⚠️⚠️⚠️
+ * NEVER NEVER CHANGE GPIO PINS WITHOUT REWIRING HARDWARE!
+ * Changing these pins requires physical rewiring which takes very long time!
+ * These pins MUST match your actual hardware connections!
+ * ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+ */
+
 /** Hardware Configuration Constants */
 #define DEFAULT_LED1_GPIO       GPIO_NUM_2
 #define DEFAULT_LED2_GPIO       GPIO_NUM_4
 #define DEFAULT_LED3_GPIO       GPIO_NUM_5
 #define DEFAULT_LED4_GPIO       GPIO_NUM_18
 
-#define DEFAULT_MOTOR_AIN1      GPIO_NUM_26
-#define DEFAULT_MOTOR_AIN2      GPIO_NUM_27
-#define DEFAULT_MOTOR_BIN1      GPIO_NUM_14
-#define DEFAULT_MOTOR_BIN2      GPIO_NUM_12
-#define DEFAULT_MOTOR_SLEEP     GPIO_NUM_13
-#define DEFAULT_MOTOR_FAULT     GPIO_NUM_25
+/** 
+ * STEPPER MOTOR GPIO PINS - UPDATED TO MATCH ACTUAL HARDWARE!
+ * DRV8833 Motor Driver Connections:
+ * AIN1 (Phase A Control) -> GPIO21
+ * AIN2 (Phase A Control) -> GPIO19  
+ * BIN1 (Phase B Control) -> GPIO16
+ * BIN2 (Phase B Control) -> GPIO17
+ * SLEEP (Driver Enable)  -> GPIO23
+ * FAULT (Error Detection) -> GPIO22
+ */
+#define DEFAULT_MOTOR_AIN1      GPIO_NUM_21
+#define DEFAULT_MOTOR_AIN2      GPIO_NUM_19
+#define DEFAULT_MOTOR_BIN1      GPIO_NUM_16
+#define DEFAULT_MOTOR_BIN2      GPIO_NUM_17
+#define DEFAULT_MOTOR_SLEEP     GPIO_NUM_23
+#define DEFAULT_MOTOR_FAULT     GPIO_NUM_22
 
 /** System Configuration */
 #define DEVICE_NAME             "ESP32_StepperMotor"
@@ -57,4 +75,4 @@ typedef enum {
 }
 #endif
 
-#endif // COMMON_TYPES_H 
+#endif // COMMON_TYPES_H

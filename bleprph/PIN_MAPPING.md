@@ -1,5 +1,11 @@
 # ESP32 Pin Mapping - Complete Project Overview
 
+## ⚠️ CRITICAL WARNING ⚠️
+## NEVER NEVER CHANGE GPIO PINS IN CODE!
+## GPIO pins are defined in: components/common/include/common_types.h
+## Changing pins requires rewiring hardware which takes very long time!
+## Always check common_types.h for actual pin definitions!
+
 ## Current GPIO Pin Assignments
 
 ### LED Control System
@@ -11,14 +17,18 @@
 | GPIO18 | LED4 | LED Control | Output | SPI SCK pin (conflicts avoided) |
 
 ### Stepper Motor Control (DRV8833)
-| Pin | GPIO | Function | Direction | DRV8833 Pin | Motor Wire |
-|-----|------|----------|-----------|-------------|------------|
-| GPIO21 | AIN1 | Motor Phase A Control | Output | AIN1 | - |
-| GPIO19 | AIN2 | Motor Phase A Control | Output | AIN2 | - |
-| GPIO16 | BIN1 | Motor Phase B Control | Output | BIN1 | - |
-| GPIO17 | BIN2 | Motor Phase B Control | Output | BIN2 | - |
-| GPIO23 | SLEEP | Motor Driver Enable | Output | SLEEP | - |
-| GPIO22 | FAULT | Motor Fault Detection | Input | FAULT | - |
+**⚠️ ACTUAL GPIO PINS ARE DEFINED IN common_types.h - NOT HERE! ⚠️**
+
+| Function | Description |
+|----------|-------------|
+| AIN1 | Motor Phase A Control |
+| AIN2 | Motor Phase A Control |
+| BIN1 | Motor Phase B Control |
+| BIN2 | Motor Phase B Control |
+| SLEEP | Motor Driver Enable |
+| FAULT | Motor Fault Detection |
+
+**Check components/common/include/common_types.h for actual GPIO numbers!**
 
 ### Motor Wire to DRV8833 Connections
 | Motor Wire Color | Motor Terminal | DRV8833 Pin | Function |
@@ -55,58 +65,6 @@
 | GPIO6-11 | Flash SPI | Reserved for internal flash |
 | GPIO12 | Boot Config | Affects boot voltage |
 | GPIO15 | Boot Config | Pull LOW for normal boot |
-
-### ADC/Touch Capable Pins (Available)
-| Pin | Alt Function | Available |
-|-----|--------------|-----------|
-| GPIO13 | Touch4, ADC2_4 | ✅ Free |
-| GPIO14 | Touch6, ADC2_6 | ✅ Free |
-| GPIO25 | DAC1, ADC2_8 | ✅ Free |
-| GPIO26 | DAC2, ADC2_9 | ✅ Free |
-| GPIO27 | Touch7, ADC2_7 | ✅ Free |
-| GPIO32 | Touch9, ADC1_4 | ✅ Free |
-| GPIO33 | Touch8, ADC1_5 | ✅ Free |
-| GPIO34 | ADC1_6 | ✅ Free (Input only) |
-| GPIO35 | ADC1_7 | ✅ Free (Input only) |
-| GPIO36 | ADC1_0 | ✅ Free (Input only) |
-| GPIO39 | ADC1_3 | ✅ Free (Input only) |
-
-## Pin Configuration Summary
-
-### Used Pins (10 total)
-- **GPIO2, 4, 5, 18** - LED Control (4 pins)
-- **GPIO16, 17, 19, 21, 22, 23** - Stepper Motor (6 pins)
-
-### Available Pins (19 total)
-- **GPIO13, 14, 25, 26, 27, 32, 33** - Digital I/O with ADC
-- **GPIO34, 35, 36, 39** - Input only with ADC
-- **GPIO0** - Available (boot control)
-- **GPIO12, 15** - Available (boot sensitive)
-- **GPIO1, 3** - UART (can be repurposed)
-
-### Reserved Pins (11 total)
-- **GPIO6-11** - Flash interface (never use)
-- **Power/Ground pins** - 3.3V, 5V, GND, EN
-
-## Expansion Possibilities
-
-### Available for Future Features
-- **Sensors**: GPIO13, 14, 25-27, 32-36, 39 (ADC capable)
-- **I2C**: Any two available pins (26/27 recommended)
-- **SPI**: GPIO12-15 available (if not using boot functions)
-- **PWM**: Any available GPIO
-- **Additional Motors**: GPIO13, 14, 25, 26, 27 for second motor
-- **Encoders**: GPIO32, 33 for quadrature encoder
-- **Limit Switches**: GPIO34, 35, 36, 39 (input only)
-
-### Recommended Pin Allocation for Expansion
-| Feature | Recommended Pins | Notes |
-|---------|------------------|-------|
-| I2C Display | GPIO26 (SDA), GPIO27 (SCL) | Standard I2C pins |
-| Second Motor | GPIO13, 14, 25, 32 | 4 pins for DRV8833 #2 |
-| Limit Switches | GPIO34, 35 | Input only, perfect for switches |
-| Rotary Encoder | GPIO36, 39 | Input only, quadrature signals |
-| Temperature Sensor | GPIO33 | ADC capable for analog sensors |
 
 ## Safety Considerations
 
@@ -145,4 +103,7 @@
 2. Measure voltages with multimeter
 3. Test individual pins with simple blink
 4. Monitor serial output for error messages
-5. Use BLE scanner to verify advertising 
+5. Use BLE scanner to verify advertising
+
+## ⚠️ REMEMBER: GPIO PINS ARE DEFINED IN common_types.h ⚠️
+## NEVER CHANGE PINS WITHOUT REWIRING HARDWARE!

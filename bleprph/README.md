@@ -1,189 +1,157 @@
-# ESP32 Stepper Motor Controller - UML Documentation
+# ESP32 Stepper Motor Controller with BLE
 
-Professional modular UML diagram collection for the ESP32 Stepper Motor BLE Controller project.
+## 🚨🚨🚨 CRITICAL PROJECT RULE 🚨🚨🚨
+## NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER
+## NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER
+## NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER NEVER
+## CHANGE GPIO PIN MAPPING IN THIS PROJECT!!!
+## 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
 
-## 📁 Directory Structure
+**GPIO pins are FINAL and defined in: `components/common/include/common_types.h`**
 
+**Changing pins requires complete hardware rewiring which takes VERY LONG TIME!**
+
+## Project Overview
+
+This project implements a complete ESP32-based stepper motor controller with Bluetooth Low Energy (BLE) connectivity. The system allows remote control of stepper motors through a mobile app or BLE client.
+
+### Key Features
+
+- **BLE Peripheral** - ESP32 advertises as BLE device for mobile app connection
+- **Stepper Motor Control** - Precise position control with DRV8833 driver
+- **LED Status Indicators** - Visual feedback for motor operations
+- **Queue-based Commands** - Reliable motor command processing
+- **Position Tracking** - Absolute and relative positioning
+- **Fault Detection** - Hardware fault monitoring
+
+### Hardware Components
+
+- **ESP32 Development Board** - Main microcontroller
+- **DRV8833 Motor Driver** - Stepper motor driver IC
+- **Stepper Motor** - NEMA 17 or similar
+- **LEDs** - Status indication (4 LEDs)
+- **Power Supply** - 5-12V for motor, 3.3V for logic
+
+### GPIO Pin Configuration
+
+**⚠️ THESE PINS ARE FINAL - NEVER CHANGE WITHOUT HARDWARE REWIRING! ⚠️**
+
+```c
+// LED Control
+#define DEFAULT_LED1_GPIO       GPIO_NUM_2
+#define DEFAULT_LED2_GPIO       GPIO_NUM_4
+#define DEFAULT_LED3_GPIO       GPIO_NUM_5
+#define DEFAULT_LED4_GPIO       GPIO_NUM_18
+
+// Motor Control (DRV8833)
+#define DEFAULT_MOTOR_AIN1      GPIO_NUM_21  // Phase A Control
+#define DEFAULT_MOTOR_AIN2      GPIO_NUM_19  // Phase A Control
+#define DEFAULT_MOTOR_BIN1      GPIO_NUM_16  // Phase B Control
+#define DEFAULT_MOTOR_BIN2      GPIO_NUM_17  // Phase B Control
+#define DEFAULT_MOTOR_SLEEP     GPIO_NUM_23  // Driver Enable
+#define DEFAULT_MOTOR_FAULT     GPIO_NUM_22  // Error Detection
 ```
-Plantuml/
-├── shared_components/          # Shared styling and components
-│   ├── common_styles.puml     # Consistent styling across all diagrams
-│   └── common_components.puml # Reusable component definitions
-│
-├── use_case_diagrams/         # Use case analysis
-│   ├── system_overview.puml   # High-level system use cases
-│   ├── led_control.puml       # LED control specific use cases
-│   └── motor_control.puml     # Motor control specific use cases
-│
-├── activity_diagrams/         # Process flows
-│   ├── system_initialization.puml  # System startup flow
-│   ├── ble_communication.puml     # BLE communication process
-│   └── motor_control.puml         # Motor control process
-│
-├── sequence_diagrams/         # Interaction timelines
-│   ├── system_startup.puml        # System initialization sequence
-│   └── ble_motor_command.puml     # BLE to motor command sequence
-│
-├── state_diagrams/           # State machine models
-│   ├── system_states.puml    # System-level state machine
-│   ├── motor_states.puml     # Motor controller state machine
-│   └── ble_states.puml       # BLE stack state machine
-│
-├── class_diagrams/           # Structural models
-│   ├── application_layer.puml     # Main application classes
-│   ├── motor_subsystem.puml       # Motor component classes
-│   └── ble_subsystem.puml         # BLE component classes
-│
-└── README.md                 # This documentation
-```
 
-## 🎯 Diagram Categories
+## Quick Start
 
-### 1. **Use Case Diagrams** - *Functional Requirements*
-- **system_overview.puml**: Complete system use case overview
-- **led_control.puml**: Detailed LED control scenarios
-- **motor_control.puml**: Comprehensive motor operation use cases
+### Prerequisites
 
-**Best for**: Requirements analysis, stakeholder communication, test case identification
+- ESP-IDF v6.0 or later
+- ESP32 development board
+- DRV8833 motor driver
+- Stepper motor
+- Mobile device with BLE capability
 
-### 2. **Activity Diagrams** - *Process Flows*
-- **system_initialization.puml**: System startup and initialization flow
-- **ble_communication.puml**: BLE communication and request handling
-- **motor_control.puml**: Motor task and command processing
+### Build and Flash
 
-**Best for**: Process understanding, workflow optimization, parallel task analysis
-
-### 3. **Sequence Diagrams** - *Interaction Timelines*
-- **system_startup.puml**: Component initialization sequence
-- **ble_motor_command.puml**: BLE command to motor execution flow
-
-**Best for**: API design, integration testing, timing analysis
-
-### 4. **State Diagrams** - *Behavioral Models*
-- **system_states.puml**: System-level state transitions
-- **motor_states.puml**: Motor controller state machine
-- **ble_states.puml**: BLE connection state management
-
-**Best for**: Control logic implementation, state validation, embedded system design
-
-### 5. **Class Diagrams** - *Structural Design*
-- **application_layer.puml**: Main application and system management
-- **motor_subsystem.puml**: Stepper motor component structure
-- **ble_subsystem.puml**: BLE peripheral and GATT services
-
-**Best for**: Code structure design, API documentation, dependency analysis
-
-## 🔧 Usage Instructions
-
-### Viewing Diagrams Online
-1. Copy any `.puml` file content
-2. Paste into [PlantUML Online Server](http://www.plantuml.com/plantuml/uml/)
-3. Generate PNG/SVG for documentation
-
-### Local Development
 ```bash
-# Install PlantUML
-npm install -g node-plantuml
+# Source ESP-IDF environment
+source ~/esp/esp-idf/export.sh
 
-# Generate all diagrams
-find . -name "*.puml" -exec plantuml {} \;
+# Build project
+idf.py build
 
-# Generate specific diagram
-plantuml use_case_diagrams/system_overview.puml
+# Flash to ESP32
+idf.py flash
+
+# Monitor output
+idf.py monitor
 ```
 
-### VS Code Integration
-Install "PlantUML" extension for:
-- Real-time preview
-- Syntax highlighting
-- Auto-completion
-- Export capabilities
+### BLE Connection
 
-## 🎨 Shared Components
+1. Flash the firmware to ESP32
+2. ESP32 will start advertising as "ESP32_StepperMotor"
+3. Connect with BLE scanner or mobile app
+4. Use GATT characteristics to control motor and LEDs
 
-### Common Styles (`shared_components/common_styles.puml`)
-- Consistent color scheme
-- Professional typography
-- Standardized component styling
-- Platform-specific theming
+## Project Structure
 
-### Reusable Components (`shared_components/common_components.puml`)
-- System enumerations (system_status_t, motor_command_t, motor_status_t)
-- Configuration classes (HardwareConfig, SystemConfig, MotorConfig)
-- Common actors (Mobile User, ESP32 Device, etc.)
-
-**Usage**: `!include ../shared_components/common_styles.puml`
-
-## 👥 Audience Guide
-
-| Role | Recommended Diagrams | Purpose |
-|------|---------------------|---------|
-| **Project Managers** | Use Case Overview, System States | Requirements, progress tracking |
-| **Software Architects** | Class Diagrams, Activity Flows | System design, component architecture |
-| **Embedded Developers** | State Machines, Sequence Diagrams | Implementation details, timing |
-| **Mobile Developers** | BLE Communication, Motor Commands | API integration, protocols |
-| **Test Engineers** | Use Cases, Activity Diagrams | Test scenario design, validation |
-| **Documentation Teams** | All diagrams | Technical documentation, user guides |
-
-## 🔄 Maintenance Guidelines
-
-### When to Update Diagrams
-- ✅ Adding new features or use cases
-- ✅ Modifying component interfaces or APIs
-- ✅ Changing system states or workflows
-- ✅ Updating communication protocols
-
-### Best Practices
-1. **Consistency**: Always use shared styles and components
-2. **Modularity**: Keep diagrams focused on specific aspects
-3. **Validation**: Ensure diagrams match actual implementation
-4. **Documentation**: Update README when adding new diagrams
-5. **Versioning**: Maintain diagram versions with code releases
-
-### Quality Checklist
-- [ ] Uses shared styling and components
-- [ ] Syntax validates in PlantUML
-- [ ] Matches actual code implementation
-- [ ] Includes meaningful notes and documentation
-- [ ] Follows naming conventions
-- [ ] Proper file organization
-
-## 📊 Diagram Statistics
-
-| Category | Count | Focus Area |
-|----------|-------|------------|
-| Use Case | 3 | Functional requirements |
-| Activity | 3 | Process flows and workflows |
-| Sequence | 2 | Component interactions |
-| State | 3 | Behavioral modeling |
-| Class | 3 | Structural design |
-| **Total** | **14** | **Complete system coverage** |
-
-## 🚀 Integration with Development
-
-### Code Synchronization
-- Diagrams reflect actual ESP32 implementation
-- Direct mapping to source code structure
-- Real function names and API calls
-- Accurate timing and constraints
-
-### Documentation Pipeline
 ```
-Code Changes → Update Relevant Diagrams → Validate Syntax → Generate Images → Update Documentation
+bleprph/
+├── components/
+│   ├── ble_peripheral/     # BLE functionality
+│   ├── stepper_motor/      # Motor control
+│   ├── motor_testing/      # Test functions
+│   └── common/            # Shared definitions (GPIO PINS!)
+├── main/                  # Main application
+├── Plantuml/             # System diagrams
+└── tutorial/             # Documentation
 ```
 
-## 📝 Contributing
+## BLE Services
 
-When adding new diagrams:
-1. Follow the modular structure
-2. Use shared components and styling
-3. Include comprehensive documentation
-4. Validate syntax and rendering
-5. Update this README
+### LED Control Service
+- **UUID**: `12345678-90ab-cdef-1234-567890abcdef`
+- **Characteristics**: LED1, LED2, LED3, LED4 control
 
----
+### Motor Control Service
+- **UUID**: `87654321-dcba-fedc-4321-ba0987654321`
+- **Characteristics**: Position, Command, Status, Speed
 
-**Project**: ESP32 Stepper Motor BLE Controller  
-**Documentation**: Professional UML Architecture Models  
-**Version**: 1.0.0  
-**Last Updated**: Current Implementation State
+## Motor Commands
+
+- **Move Absolute**: Move to specific position
+- **Move Relative**: Move by number of steps
+- **Home**: Return to zero position
+- **Stop**: Emergency stop
+- **Set Speed**: Adjust movement speed
+
+## Safety Features
+
+- **Fault Detection**: Hardware fault monitoring via DRV8833 FAULT pin
+- **Position Limits**: Software limits to prevent over-travel
+- **Emergency Stop**: Immediate motor stop capability
+- **Power Management**: Motor driver sleep mode for power saving
+
+## Troubleshooting
+
+### Motor Not Moving
+1. Check GPIO pin connections match code definitions
+2. Verify DRV8833 power supply (5-12V on VM pin)
+3. Check motor wiring to DRV8833 outputs
+4. Monitor serial output for error messages
+
+### BLE Connection Issues
+1. Verify ESP32 is advertising (check serial output)
+2. Clear BLE cache on mobile device
+3. Check BLE scanner for "ESP32_StepperMotor" device
+4. Ensure proper BLE service UUIDs
+
+### Build Errors
+1. Check ESP-IDF version (v6.0+ required)
+2. Source ESP-IDF environment before building
+3. Clean build directory: `idf.py fullclean`
+4. Check component dependencies
+
+## Documentation
+
+- `PIN_MAPPING.md` - Hardware pin assignments
+- `tutorial/` - Detailed walkthroughs
+- `Plantuml/` - System architecture diagrams
+- Component READMEs - Individual component documentation
+
+## ⚠️ FINAL WARNING ⚠️
+**NEVER CHANGE GPIO PINS WITHOUT COMPLETE HARDWARE REWIRING!**
+**GPIO pin definitions are in `components/common/include/common_types.h`**
+**Changing pins requires very long time for hardware modifications!**
