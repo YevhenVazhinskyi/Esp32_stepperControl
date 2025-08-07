@@ -184,9 +184,9 @@ static int motor_svc_access(uint16_t conn_handle, uint16_t attr_handle, struct b
             case BLE_GATT_ACCESS_OP_READ_CHR: {
                 ESP_LOGI(TAG, "Motor position read; conn_handle=%d", conn_handle);
                 int16_t motor_position = stepper_motor_get_position(g_motor);
-                // Convert motor position (0-2000) to app position (0-100) - CALIBRATED
-                // motor_pos 0 = app_pos 0 (LEFT limit), motor_pos 2000 = app_pos 100 (RIGHT limit)
-                int16_t app_position = motor_position / 20;
+                // Convert motor position (0-3000) to app position (0-100) - CALIBRATED
+                // motor_pos 0 = app_pos 0 (LEFT limit), motor_pos 3000 = app_pos 100 (RIGHT limit)
+                int16_t app_position = motor_position / 30;
                 return os_mbuf_append(ctxt->om, &app_position, sizeof(int16_t));
             }
             case BLE_GATT_ACCESS_OP_WRITE_CHR: {
@@ -194,12 +194,12 @@ static int motor_svc_access(uint16_t conn_handle, uint16_t attr_handle, struct b
                 int16_t app_position;
                 int rc = gatt_svr_write(ctxt->om, sizeof(int16_t), sizeof(int16_t), &app_position, NULL);
                 if (rc == 0) {
-                    // Scale app position (0-100) to motor position (0-2000) - CALIBRATED
-                    // 0 = LEFT limit (calibrated 0), 100 = RIGHT limit (calibrated 0 + 2000)
-                    // Formula: motor_pos = app_pos * 20
-                    int16_t motor_position = app_position * 20;
+                    // Scale app position (0-100) to motor position (0-3000) - CALIBRATED
+                    // 0 = LEFT limit (calibrated 0), 100 = RIGHT limit (calibrated 0 + 3000)
+                    // Formula: motor_pos = app_pos * 30
+                    int16_t motor_position = app_position * 30;
                     
-                    ESP_LOGI(TAG, "Position scaling CALIBRATED: app=%d -> motor=%d (0=LEFT/0, 100=RIGHT/2000)", app_position, motor_position);
+                    ESP_LOGI(TAG, "Position scaling CALIBRATED: app=%d -> motor=%d (0=LEFT/0, 100=RIGHT/3000)", app_position, motor_position);
                     flash_led(0, 200); // Flash LED1 for position command
                     stepper_motor_move_to_position(g_motor, motor_position);
                 }

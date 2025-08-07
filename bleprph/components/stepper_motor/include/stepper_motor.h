@@ -15,7 +15,7 @@ extern "C" {
 #define MICROSTEPS             1       // No microstepping with DRV8833
 #define THREAD_PITCH_MM        2.0     // 2mm thread pitch
 #define STEPS_PER_MM           (STEPS_PER_REVOLUTION * MICROSTEPS / THREAD_PITCH_MM)
-#define STROKE_LENGTH_MM       20      // 20mm stroke length (calibrated for 2000 steps max)
+#define STROKE_LENGTH_MM       30      // 30mm stroke length (calibrated for 3000 steps max)
 
 // Motor command enumeration
 typedef enum {
